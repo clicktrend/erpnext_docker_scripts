@@ -44,6 +44,7 @@ export PULL_POLICY='never'
 docker compose --project-name erpnext --env-file $ERPNEXT_TARGET_ENV_FILE \
   -f $FRAPPE_DOCKER_DIR/compose.yaml \
   -f $FRAPPE_DOCKER_DIR/overrides/compose.redis.yaml \
+  -f resources/backup-job.yaml \
   -f $FRAPPE_DOCKER_DIR/overrides/compose.multi-bench.yaml \
   -f $FRAPPE_DOCKER_DIR/overrides/compose.multi-bench-ssl.yaml config > $ERPNEXT_CUSTOM_TARGET_YAML_FILE
 
