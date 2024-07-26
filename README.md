@@ -1,99 +1,141 @@
-ERPNext Bash Scripts For Easy Docker Compose Setup
-==================================================
+# ERPNext Bash Scripts for Easy Docker Compose Setup
 
-Easy to use for my own purpose. It will create .scripts directory and all necessary env files.
+This collection of bash scripts simplifies the setup of ERPNext using Docker Compose. It will create the `.scripts` directory and all necessary environment files.
 
-Installation Steps
-------------------
+## Installation
 
-Clone project and start installation.
+### Clone the Project and Start Installation
 
-    https://github.com/clicktrend/erpnext_docker_scripts.git
-    cd erpnext_docker_scripts
+Feel free to use any location. Home directory is fine.
 
-Make script folder executable
+```bash
+git clone https://github.com/clicktrend/erpnext_docker_scripts.git
+cd erpnext_docker_scripts
+```
 
-    chmod +x scripts/*
+### Make Script Folder Executable
 
-Setup project 
-    
-    scripts/setup.sh
+```bash
+chmod +x scripts/*
+```
 
-After first run .env is created. Edit file if needed and change INSTALLED to true.
-Run script again
+### Setup Project
 
-    scripts/setup.sh
+```bash
+scripts/setup.sh
+```
 
-Setup traefik 
-    
-    scripts/traefik-setup.sh
+After the first run, the `.env` file is created. Edit this file if needed and change `INSTALLED` to `true`. Run the script again:
 
-Change your DNS to site you entered.
+```bash
+scripts/setup.sh
+```
 
-Start traefik
+`.configs` directory will be created. Most files will be created inside this directory in the next steps. 
 
-    scripts/traefik-docker.sh up
-    // other tasks
-    scripts/traefik-docker.sh down
-    scripts/traefik-docker.sh logs
+## Setup Traefik
 
-Go to Traefik dashboard with domain you entered and login with "admin" and password you set!
+### Run Traefik Setup
 
-Setup mariadb
+```bash
+scripts/traefik-setup.sh
+```
 
-    scripts/mariadb-setup.sh
+Change your DNS to the site you entered.
 
-Start mariadb
+### Start Traefik
 
-    scripts/mariadb-docker.sh up
-    // other tasks
-    scripts/mariadb-docker.sh down
-    scripts/mariadb-docker.sh logs
+```bash
+scripts/traefik-docker.sh up
+# Other tasks
+scripts/traefik-docker.sh down
+scripts/traefik-docker.sh logs
+```
 
-Initial Setup for ERPNext
+Go to the Traefik dashboard with the domain you entered and log in with "admin" and the password you set!
 
-    scripts/erpnext-setup.sh
+## Setup MariaDB
 
-Start ERPNext for first time
+### Run MariaDB Setup
 
-    scripts/erpnext-docker.sh up
-    // other tasks
-    scripts/erpnext-docker.sh down
-    scripts/erpnext-docker.sh logs
+```bash
+scripts/mariadb-setup.sh
+```
 
-Check traefik dashboard if router has started.
+### Start MariaDB
 
-Initial creation of ERPNext site after containers has started with step 8.
+```bash
+scripts/mariadb-docker.sh up
+# Other tasks
+scripts/mariadb-docker.sh down
+scripts/mariadb-docker.sh logs
+```
 
-    scripts/erpnext-create-site.sh
+## Initial Setup for ERPNext
 
-Build custom docker image
+### Run ERPNext Setup
 
-    scripts/erpnext-custom-setup.sh
+```bash
+scripts/erpnext-setup.sh
+```
 
-Start ERPNext custom (shutdown containers if running)
+### Start ERPNext for the First Time
 
-    scripts/erpnext-docker.sh down
-    scripts/erpnext-custom-docker.sh up
+```bash
+scripts/erpnext-docker.sh up
+# Other tasks
+scripts/erpnext-docker.sh down
+scripts/erpnext-docker.sh logs
+```
 
-If apps.json doesn't exist in .configs directory template will be copied from .frappe_docker directory.
-Change apps.json and run command again.
+Check the Traefik dashboard to see if the router has started.
 
-Deploy Strategy
----------------
+### Initial Creation of ERPNext Site After Containers Have Started (see previous setp)
 
-1. Change apps.json
-2. Change ERPNEXT_CUSTOM_TAG in .env
-3. Run scripts/erpnext-custom-setup.sh
-4. Run scripts/erpnext-custom-docker.sh up
+```bash
+scripts/erpnext-create-site.sh
+```
 
-Depending on your installation install apps, migrate system. See Helper section.
+## Build Custom Docker Image
 
-Helper
-------
+### Setup Custom Docker Image
 
-Use this command to run bench in backend. Container backend must be running
+```bash
+scripts/erpnext-custom-setup.sh
+```
 
-    scripts/erpnext-backend.sh bench
-    // e.g.
-    scripts/erpnext-backend.sh bench --site one.example.com install-app hrms
+### Start Custom ERPNext (Shutdown Containers if Running)
+
+```bash
+scripts/erpnext-docker.sh down
+scripts/erpnext-custom-docker.sh up
+```
+
+If `apps.json` does not exist in the `.configs` directory, a template will be copied from the `.frappe_docker` directory. Change `apps.json` and run the command again.
+
+## Deployment Strategy with HRMS example
+
+Depending on your installation, install apps and migrate the system. See the Helper section.
+Use domain you entered with `--site` parameter.
+
+1. Change `apps.json`
+2. Change `ERPNEXT_CUSTOM_TAG` in `.env`
+3. Run `scripts/erpnext-custom-setup.sh`
+4. Run `scripts/erpnext-custom-docker.sh up`
+5. Run `scripts/erpnext-backend.sh bench --site one.example.com install-app hrms`
+6. Run `scripts/erpnext-backend.sh bench --site one.example.com migrate`
+7. Run `scripts/erpnext-backend.sh bench --site one.example.com build`
+8. Stop and start containers `scripts/erpnext-custom-docker.sh down` and `scripts/erpnext-custom-docker.sh up`
+
+## Helper
+
+Use this command to run `bench` in the backend. The `backend` container must be running.
+
+```bash
+scripts/erpnext-backend.sh bench
+# Examples
+scripts/erpnext-backend.sh bench --site one.example.com install-app hrms
+scripts/erpnext-backend.sh bench --site one.example.com migrate
+scripts/erpnext-backend.sh bench --site one.example.com build
+scripts/erpnext-backend.sh bench --site one.example.com list-apps
+```
