@@ -11,13 +11,12 @@ services:
         ## Uncomment for restic snapshots.
         # restic snapshots || restic init
         # restic backup sites
-        restic forget --group-by=paths --keep-last=30 --prune
+        # restic forget --group-by=paths --keep-last=30 --prune
     environment:
-      # Set correct environment variables for restic
-      - RESTIC_REPOSITORY=s3:https://s3.endpoint.com/restic
-      - AWS_ACCESS_KEY_ID=access_key
-      - AWS_SECRET_ACCESS_KEY=secret_access_key
-      - RESTIC_PASSWORD=restic_password
+      RESTIC_REPOSITORY: $RESTIC_REPOSITORY
+      AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+      AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+      RESTIC_PASSWORD: $RESTIC_PASSWORD
     volumes:
       - "sites:/home/frappe/frappe-bench/sites"
     networks:

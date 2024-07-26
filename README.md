@@ -31,7 +31,8 @@ After the first run, the `.env` file is created. Edit this file if needed and ch
 scripts/setup.sh
 ```
 
-`.configs` directory will be created. Most files will be created inside this directory in the next steps. 
+`.configs` directory will be created. Most files will be created inside this directory in the next steps. Project `frappe_docker`
+will be cloned into `.frappe_docker`.
 
 ## Setup Traefik
 
@@ -47,6 +48,8 @@ Change your DNS to the site you entered.
 
 ```bash
 scripts/traefik-docker.sh up
+```
+```bash
 # Other tasks
 scripts/traefik-docker.sh down
 scripts/traefik-docker.sh logs
@@ -66,6 +69,8 @@ scripts/mariadb-setup.sh
 
 ```bash
 scripts/mariadb-docker.sh up
+```
+```bash
 # Other tasks
 scripts/mariadb-docker.sh down
 scripts/mariadb-docker.sh logs
@@ -83,6 +88,8 @@ scripts/erpnext-setup.sh
 
 ```bash
 scripts/erpnext-docker.sh up
+```
+```bash
 # Other tasks
 scripts/erpnext-docker.sh down
 scripts/erpnext-docker.sh logs
@@ -139,3 +146,14 @@ scripts/erpnext-backend.sh bench --site one.example.com migrate
 scripts/erpnext-backend.sh bench --site one.example.com build
 scripts/erpnext-backend.sh bench --site one.example.com list-apps
 ```
+
+## Backup
+
+To backup run manually `scripts/erpnext-backup.sh`.
+Or add this line to cronjob of the server.
+
+```bash
+0 */6 * * * /path_to/scripts/erpnext-backup.sh > /dev/null
+```
+
+To activate restic edit backup section in `.env`, uncomment command lines from `resources/backup-job.yaml` and rerun `scripts/erpnext-setup.sh` and `scripts/erpnext-custom-setup.sh`
