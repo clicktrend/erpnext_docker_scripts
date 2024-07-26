@@ -41,7 +41,7 @@ export CUSTOM_IMAGE=$ERPNEXT_CUSTOM_IMAGE
 export CUSTOM_TAG=$ERPNEXT_CUSTOM_TAG
 export PULL_POLICY='never'
 
-docker compose --project-name erpnext --env-file $ERPNEXT_TARGET_ENV_FILE \
+docker compose --project-name erpnext --env-file .env --env-file $ERPNEXT_TARGET_ENV_FILE \
   -f $FRAPPE_DOCKER_DIR/compose.yaml \
   -f $FRAPPE_DOCKER_DIR/overrides/compose.redis.yaml \
   -f resources/backup-job.yaml \
