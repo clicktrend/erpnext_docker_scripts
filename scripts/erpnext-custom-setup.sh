@@ -13,11 +13,18 @@ else
 fi
 
 # Encode the apps.json file in Base64
-APPS_JSON_BASE64=$(base64 -w 0 $ERPNEXT_CUSTOM_APPS_JSON_FILE)
+APPS_JSON_BASE64=$(base64 -w 0 "$ERPNEXT_CUSTOM_APPS_JSON_FILE")
 
-# Check if ERPNEXT_CUSTOM_TARGET_ENV_FILE exists
-if [ ! -f "$ERPNEXT_CUSTOM_TARGET_ENV_FILE" ]; then
-  echo "The file $ERPNEXT_CUSTOM_TARGET_ENV_FILE does not exist. Aborting."
+# Decode the Base64 encoded string to verify it
+DECODED_APPS_JSON=$(echo "$APPS_JSON_BASE64" | base64 --decode)
+
+# Output the decoded JSON for verification
+echo "Decoded JSON from Base64:"
+echo "$DECODED_APPS_JSON"
+
+# Check if ERPNEXT_TARGET_ENV_FILE exists
+if [ ! -f "$ERPNEXT_TARGET_ENV_FILE" ]; then
+  echo "The file $ERPNEXT_TARGET_ENV_FILE does not exist. Aborting."
   exit 1
 fi
 
@@ -30,19 +37,19 @@ docker build \
 echo "Custom image has been created."
 
 # Export environment variables
-export ERPNEXT_CUSTOM_IMAGE=$ERPNEXT_CUSTOM_IMAGE
-export ERPNEXT_CUSTOM_TAG=$ERPNEXT_CUSTOM_TAG
+export CUSTOM_IMAGE=$ERPNEXT_CUSTOM_IMAGE
+export CUSTOM_TAG=$ERPNEXT_CUSTOM_TAG
 export PULL_POLICY='never'
 
-docker compose --project-name erpnext --env-file $ERPNEXT_CUSTOM_TARGET_ENV_FILE \
+docker compose --project-name erpnext --env-file $ERPNEXT_TARGET_ENV_FILE \
   -f $FRAPPE_DOCKER_DIR/compose.yaml \
   -f $FRAPPE_DOCKER_DIR/overrides/compose.redis.yaml \
   -f $FRAPPE_DOCKER_DIR/overrides/compose.multi-bench.yaml \
   -f $FRAPPE_DOCKER_DIR/overrides/compose.multi-bench-ssl.yaml config > $ERPNEXT_CUSTOM_TARGET_YAML_FILE
 
 # Unset environment variables
-unset ERPNEXT_CUSTOM_IMAGE
-unset ERPNEXT_CUSTOM_TAG
+unset CUSTOM_IMAGE
+unset CUSTOM_TAG
 unset PULL_POLICY
 
 echo "Environment variables have been unset."
