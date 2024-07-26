@@ -29,7 +29,7 @@ run_docker_compose() {
       docker compose --project-name $TRAEFIK_PROJECT_NAME \
         --env-file $TRAEFIK_TARGET_ENV_FILE \
         -f $TRAEFIK_COMPOSE_FILE_1 \
-        -f $TRAEFIK_COMPOSE_FILE_2 logs
+        -f $TRAEFIK_COMPOSE_FILE_2 logs -f
       ;;
     *)
       echo "Invalid action: $ACTION"
