@@ -9,14 +9,14 @@ services:
       - |
         bench --site all backup
         ## Uncomment for restic snapshots.
-        # restic snapshots || restic init
-        # restic backup sites
-        # restic forget --group-by=paths --keep-last=30 --prune
+        restic snapshots || restic init
+        restic backup sites
+        restic forget --group-by=paths --keep-last=30 --prune
     environment:
-      RESTIC_REPOSITORY: $RESTIC_REPOSITORY
-      AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
-      AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
-      RESTIC_PASSWORD: $RESTIC_PASSWORD
+      RESTIC_REPOSITORY: "$RESTIC_REPOSITORY"
+      AWS_ACCESS_KEY_ID: "$AWS_ACCESS_KEY_ID"
+      AWS_SECRET_ACCESS_KEY: "$AWS_SECRET_ACCESS_KEY"
+      RESTIC_PASSWORD: "$RESTIC_PASSWORD"
     volumes:
       - "sites:/home/frappe/frappe-bench/sites"
     networks:
