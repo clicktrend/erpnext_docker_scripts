@@ -28,19 +28,41 @@ if [ ! -f "$ERPNEXT_TARGET_ENV_FILE" ]; then
   exit 1
 fi
 
-# Build Docker image
+# Step 1: Build the backend image
+echo "Building the backend image..."
+docker build \
+  --build-arg=APPS_JSON_BASE64=$APPS_JSON_BASE64 \
+  --tag=base:$ERPNEXT_CUSTOM_TAG \
+  --tag=base:latest \
+  --file=$FRAPPE_DOCKER_DIR/images/layered/Containerfile \
+  $FRAPPE_DOCKER_DIR
+
+if [ $? -ne 0 ]; then
+  echo "Failed to build the backend image. Aborting."
+  exit 1
+fi
+echo "Backend image has been successfully built."
+
+# Step 2: Build your custom image that extends backend
+echo "Building the custom image..."
 docker build \
   --build-arg=APPS_JSON_BASE64=$APPS_JSON_BASE64 \
   --tag=$ERPNEXT_CUSTOM_IMAGE:$ERPNEXT_CUSTOM_TAG \
-  --file=$FRAPPE_DOCKER_DIR/images/custom/Containerfile $FRAPPE_DOCKER_DIR
+  --file=images/layered/Dockerfile \
+  $FRAPPE_DOCKER_DIR
 
-echo "Custom image has been created."
+if [ $? -ne 0 ]; then
+  echo "Failed to build the custom image. Aborting."
+  exit 1
+fi
+echo "Custom image has been successfully built."
 
-# Export environment variables
+# Step 3: Export environment variables
 export CUSTOM_IMAGE=$ERPNEXT_CUSTOM_IMAGE
 export CUSTOM_TAG=$ERPNEXT_CUSTOM_TAG
 export PULL_POLICY='never'
 
+# Step 4: Generate Docker Compose configuration
 docker compose --project-name erpnext --env-file .env --env-file $ERPNEXT_TARGET_ENV_FILE \
   -f $FRAPPE_DOCKER_DIR/compose.yaml \
   -f $FRAPPE_DOCKER_DIR/overrides/compose.redis.yaml \
@@ -48,14 +70,12 @@ docker compose --project-name erpnext --env-file .env --env-file $ERPNEXT_TARGET
   -f $FRAPPE_DOCKER_DIR/overrides/compose.multi-bench.yaml \
   -f $FRAPPE_DOCKER_DIR/overrides/compose.multi-bench-ssl.yaml config > $ERPNEXT_CUSTOM_TARGET_YAML_FILE
 
-# Unset environment variables
+# Step 5: Unset environment variables
 unset CUSTOM_IMAGE
 unset CUSTOM_TAG
 unset PULL_POLICY
 
-echo "Environment variables have been unset."
-
-# Output success message
+# Step 6: Output success message
 if [ $? -eq 0 ]; then
     echo "Docker Compose configuration has been successfully created and written to $ERPNEXT_CUSTOM_TARGET_YAML_FILE."
 else

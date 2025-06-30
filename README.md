@@ -4,6 +4,10 @@ This collection of bash scripts simplifies the setup of ERPNext using Docker Com
 
 ## Installation
 
+### Ubuntu installation tutorial
+
+Read https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository
+
 ### Clone the Project and Start Installation
 
 Feel free to use any location. Home directory is fine.
@@ -76,6 +80,8 @@ scripts/mariadb-docker.sh down
 scripts/mariadb-docker.sh logs
 ```
 
+TO reinstall delete mariadb volume before
+
 ## Initial Setup for ERPNext
 
 ### Run ERPNext Setup
@@ -129,10 +135,12 @@ Use domain you entered with `--site` parameter.
 2. Change `ERPNEXT_CUSTOM_TAG` in `.env`
 3. Run `scripts/erpnext-custom-setup.sh`
 4. Run `scripts/erpnext-custom-docker.sh up`
-5. Run `scripts/erpnext-backend.sh bench --site one.example.com install-app hrms`
-6. Run `scripts/erpnext-backend.sh bench --site one.example.com migrate`
-7. Run `scripts/erpnext-backend.sh bench --site one.example.com build`
-8. Stop and start containers `scripts/erpnext-custom-docker.sh down` and `scripts/erpnext-custom-docker.sh up`
+5. Run `scripts/erpnext-backend.sh bench use one.example.com` to set default --site parameter
+6a. Run `scripts/erpnext-backend.sh bench get-app --branch version-15 hrms`
+6b. Run `scripts/erpnext-backend.sh bench install-app hrms`
+7. Run `scripts/erpnext-backend.sh bench migrate`
+8. Run `scripts/erpnext-backend.sh bench build`
+9. Stop and start containers `scripts/erpnext-custom-docker.sh down` and `scripts/erpnext-custom-docker.sh up`
 
 ## Helper
 
@@ -157,3 +165,20 @@ Or add this line to cronjob of the server.
 ```
 
 To activate restic edit backup section in `.env`, uncomment command lines from `resources/backup-job.yaml` and rerun `scripts/erpnext-setup.sh` and `scripts/erpnext-custom-setup.sh`
+
+## DEPLOYMENT
+
+To deploy new version do these following steps
+
+1. Sync your git and tag new Version e.g. 0.0.2
+2. Update tag version in apps.json
+3. update ERPNEXT_CUSTOM_TAG
+4. Run `scripts/erpnext-custom-setup.sh` and wait for successfull image build
+5. Stop and start services
+    Run `scripts/erpnext-custom-docker.sh down`
+    Run `scripts/erpnext-custom-docker.sh up`
+6. Run `scripts/erpnext-backend.sh bench migrate`
+7. Run `scripts/erpnext-backend.sh bench build`
+8. Stop and start services
+    Run `scripts/erpnext-custom-docker.sh down`
+    Run `scripts/erpnext-custom-docker.sh up`
