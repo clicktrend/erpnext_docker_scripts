@@ -32,6 +32,7 @@ fi
 echo "Building the backend image..."
 docker build \
   --build-arg=APPS_JSON_BASE64=$APPS_JSON_BASE64 \
+  --build-arg=FRAPPE_BRANCH=${FRAPPE_BRANCH:?No FRAPPE_BRANCH set in .env} \
   --tag=base:$ERPNEXT_CUSTOM_TAG \
   --tag=base:latest \
   --file=$FRAPPE_DOCKER_DIR/images/layered/Containerfile \

@@ -1,18 +1,14 @@
 [
   {
     "url": "https://github.com/frappe/erpnext.git",
-    "branch": "version-15"
+    "branch": "version-16"
   },
   {
     "url": "https://github.com/frappe/hrms.git",
-    "branch": "version-15"
+    "branch": "version-16"
   },
   {
-    "url": "https://github.com/frappe/print_designer.git",
+    "url": "https://gitlab.com/clicktrend/adomio_erpnext_app.git",
     "branch": "develop"
-  },
-  {
-    "url": "https://github.com/frappe/erpnext_germany.git",
-    "branch": "version-15"
   }
 ]
