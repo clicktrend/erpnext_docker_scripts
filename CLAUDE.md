@@ -77,4 +77,4 @@ Tag version is controlled by `ERPNEXT_CUSTOM_TAG` in `.env`. The generated compo
 
 ## Backup
 
-`resources/backup-job.yaml` defines a one-shot `backup` service. The restic lines are currently **commented out** — only `bench --site all backup` runs. To enable S3 backup, uncomment the restic lines and re-run `erpnext-custom-setup.sh`. Credentials are in `.env` under `RESTIC_*` and `AWS_*`.
+Backups are handled entirely by ERPNext's built-in scheduler and backup feature (configured under **Settings → Backups** in the ERPNext UI). No external scripts or cron jobs are needed.
