@@ -1,22 +1,10 @@
-# backup-job.yml
-version: "3.7"
 services:
   backup:
     image: ${CUSTOM_IMAGE:-frappe/erpnext}:${CUSTOM_TAG:-${ERPNEXT_VERSION:?No ERPNext version or tag set}}
     platform: linux/amd64
     entrypoint: ["bash", "-c"]
     command:
-      - |
-        bench --site all backup
-        ## Uncomment for restic snapshots.
-        restic snapshots || restic init
-        restic backup sites
-        restic forget --group-by=paths --keep-last=30 --prune
-    environment:
-      RESTIC_REPOSITORY: "$RESTIC_REPOSITORY"
-      AWS_ACCESS_KEY_ID: "$AWS_ACCESS_KEY_ID"
-      AWS_SECRET_ACCESS_KEY: "$AWS_SECRET_ACCESS_KEY"
-      RESTIC_PASSWORD: "$RESTIC_PASSWORD"
+      - bench --site all backup
     volumes:
       - "sites:/home/frappe/frappe-bench/sites"
     networks:

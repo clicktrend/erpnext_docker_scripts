@@ -25,6 +25,12 @@ run_docker_compose() {
       docker compose --project-name $ERPNEXT_PROJECT_NAME \
         -f $ERPNEXT_TARGET_YAML_FILE logs -f
       ;;
+    restart)
+      docker compose --project-name $ERPNEXT_PROJECT_NAME \
+        -f $ERPNEXT_TARGET_YAML_FILE down
+      docker compose --project-name $ERPNEXT_PROJECT_NAME \
+        -f $ERPNEXT_TARGET_YAML_FILE up -d
+      ;;
     *)
       echo "Invalid action: $ACTION"
       exit 1
@@ -48,11 +54,11 @@ fi
 
 # Process the argument
 case $1 in
-    up|down|logs)
+    up|down|logs|restart)
         run_docker_compose $1
         ;;
     *)
-        echo "Invalid argument. Please use 'up', 'down', or 'logs'."
+        echo "Invalid argument. Please use 'up', 'down', 'logs', or 'restart'."
         exit 1
         ;;
 esac

@@ -28,6 +28,14 @@ run_docker_compose() {
         --env-file $MARIADB_TARGET_ENV_FILE \
         -f $MARIADB_COMPOSE_FILE_1 logs -f
       ;;
+    restart)
+      docker compose --project-name $MARIADB_PROJECT_NAME \
+        --env-file $MARIADB_TARGET_ENV_FILE \
+        -f $MARIADB_COMPOSE_FILE_1 down
+      docker compose --project-name $MARIADB_PROJECT_NAME \
+        --env-file $MARIADB_TARGET_ENV_FILE \
+        -f $MARIADB_COMPOSE_FILE_1 up -d
+      ;;
     *)
       echo "Invalid action: $ACTION"
       exit 1
@@ -51,11 +59,11 @@ fi
 
 # Process the argument
 case $1 in
-    up|down|logs)
+    up|down|logs|restart)
         run_docker_compose $1
         ;;
     *)
-        echo "Invalid argument. Please use 'up', 'down', or 'logs'."
+        echo "Invalid argument. Please use 'up', 'down', 'logs', or 'restart'."
         exit 1
         ;;
 esac

@@ -1,0 +1,18 @@
+[
+  {
+    "url": "https://github.com/frappe/erpnext.git",
+    "branch": "version-15"
+  },
+  {
+    "url": "https://github.com/frappe/hrms.git",
+    "branch": "version-15"
+  },
+  {
+    "url": "https://github.com/frappe/print_designer.git",
+    "branch": "develop"
+  },
+  {
+    "url": "https://github.com/frappe/erpnext_germany.git",
+    "branch": "version-15"
+  }
+]
