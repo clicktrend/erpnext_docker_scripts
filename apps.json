@@ -8,7 +8,7 @@
     "branch": "version-16"
   },
   {
-    "url": "https://gitlab.com/clicktrend/adomio_erpnext_app.git",
+    "url": "git@gitlab.com:clicktrend/adomio_erpnext_app.git",
     "branch": "develop"
   }
 ]

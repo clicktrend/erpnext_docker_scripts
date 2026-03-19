@@ -29,10 +29,17 @@ if [ ! -f "$ERPNEXT_TARGET_ENV_FILE" ]; then
 fi
 
 # Step 1: Build the backend image
+DEPLOY_KEY_FILE="${CONFIGS_DIR}/deploy_key"
+if [ ! -f "$DEPLOY_KEY_FILE" ]; then
+  echo "Deploy key not found at $DEPLOY_KEY_FILE. Aborting."
+  exit 1
+fi
+
 echo "Building the backend image..."
-docker build \
+DOCKER_BUILDKIT=1 docker build \
   --build-arg=APPS_JSON_BASE64=$APPS_JSON_BASE64 \
   --build-arg=FRAPPE_BRANCH=${FRAPPE_BRANCH:?No FRAPPE_BRANCH set in .env} \
+  --secret id=deploy_key,src=$DEPLOY_KEY_FILE \
   --tag=base:$ERPNEXT_CUSTOM_TAG \
   --tag=base:latest \
   --file=$FRAPPE_DOCKER_DIR/images/layered/Containerfile \
