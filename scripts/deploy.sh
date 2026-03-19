@@ -15,6 +15,18 @@ step() {
   echo "──────────────────────────────────────────"
 }
 
+# ── Preflight: Deploy key ──────────────────────────────────────────────────────
+DEPLOY_KEY_FILE="${CONFIGS_DIR}/deploy_key"
+if [ ! -f "$DEPLOY_KEY_FILE" ]; then
+  echo ""
+  echo "  ERROR: Deploy key not found at $DEPLOY_KEY_FILE"
+  echo ""
+  echo "  Generate it once with:"
+  echo "    ssh-keygen -t ed25519 -C 'erpnext-build-deploy-key' -f $DEPLOY_KEY_FILE -N ''"
+  echo "  Then add the public key as a read-only Deploy Key in GitLab."
+  exit 1
+fi
+
 # ── Step 1: Update ─────────────────────────────────────────────────────────────
 step "1/7  Update scripts + frappe_docker"
 scripts/update.sh
