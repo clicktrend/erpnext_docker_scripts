@@ -24,6 +24,18 @@ RUN cd /home/frappe/frappe-bench/apps && \
         fi \
     done
 
+# Build React frontend (adomio workstation SPA)
+# Output goes to adomio/public/frontend/ → served via sites/assets/adomio/frontend/
+RUN if [ -f /home/frappe/frappe-bench/apps/adomio/frontend/package.json ]; then \
+        echo "Building adomio React frontend..." && \
+        cd /home/frappe/frappe-bench/apps/adomio/frontend && \
+        npm install --no-audit --no-fund && \
+        node_modules/.bin/vite build && \
+        echo "Frontend build complete."; \
+    else \
+        echo "No frontend/package.json found, skipping React build."; \
+    fi
+
 # Arbeitsverzeichnis setzen (falls nötig)
 WORKDIR /home/frappe/frappe-bench
 

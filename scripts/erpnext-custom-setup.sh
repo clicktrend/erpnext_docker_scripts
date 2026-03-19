@@ -1,7 +1,17 @@
 #!/bin/bash
+# Usage: scripts/erpnext-custom-setup.sh [--fresh]
+#   --fresh  Rebuild base image without Docker cache (forces fresh git clone of all apps)
 
 # Source the common file
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
+
+FRESH_BUILD=false
+for arg in "$@"; do
+  if [ "$arg" = "--fresh" ]; then
+    FRESH_BUILD=true
+    echo "⚡ --fresh: Base image will be rebuilt without Docker cache."
+  fi
+done
 
 # Check if $ERPNEXT_CUSTOM_APPS_JSON_FILE exists
 if [ ! -f "$ERPNEXT_CUSTOM_APPS_JSON_FILE" ]; then
@@ -36,7 +46,13 @@ if [ ! -f "$DEPLOY_KEY_FILE" ]; then
 fi
 
 echo "Building the backend image..."
+NO_CACHE_FLAG=""
+if [ "$FRESH_BUILD" = true ]; then
+  NO_CACHE_FLAG="--no-cache"
+  echo "  (--no-cache active: rebuilding all layers from scratch)"
+fi
 DOCKER_BUILDKIT=1 docker build \
+  $NO_CACHE_FLAG \
   --build-arg=APPS_JSON_BASE64=$APPS_JSON_BASE64 \
   --build-arg=FRAPPE_BRANCH=${FRAPPE_BRANCH:?No FRAPPE_BRANCH set in .env} \
   --secret id=deploy_key,src=$DEPLOY_KEY_FILE \

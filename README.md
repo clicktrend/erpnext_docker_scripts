@@ -106,8 +106,14 @@ To release a new version:
 3. Bump `ERPNEXT_CUSTOM_TAG` in `.env`
 4. Build and regenerate the compose config:
    ```bash
+   # Standard build (uses Docker cache — fast, but may skip new app commits):
    scripts/erpnext-custom-setup.sh
+
+   # Fresh build (no cache — picks up latest git commits from all apps):
+   scripts/erpnext-custom-setup.sh --fresh
    ```
+   > Use `--fresh` whenever you pushed new commits to a custom app (e.g. `adomio`).
+   > Without `--fresh`, Docker may reuse the cached git-clone layer and miss your changes.
 5. Restart ERPNext:
    ```bash
    scripts/erpnext-custom-docker.sh restart
