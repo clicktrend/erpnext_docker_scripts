@@ -38,8 +38,8 @@ mkdir -p "$CONFIGS_DIR"
 echo "$CONFIGS_DIR created."
 
 # Check if the frappe_docker directory already exists
-if [ -d "frappe_docker" ]; then
-  echo "The frappe_docker directory already exists. Skipping cloning."
+if [ -d "$FRAPPE_DOCKER_DIR" ]; then
+  echo "The $FRAPPE_DOCKER_DIR directory already exists. Skipping cloning."
 else
   # Clone the repository
   git clone https://github.com/clicktrend/frappe_docker.git $FRAPPE_DOCKER_DIR
