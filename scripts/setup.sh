@@ -42,6 +42,6 @@ if [ -d "frappe_docker" ]; then
   echo "The frappe_docker directory already exists. Skipping cloning."
 else
   # Clone the repository
-  git clone https://github.com/frappe/frappe_docker.git $FRAPPE_DOCKER_DIR
-  echo "Repository https://github.com/frappe/frappe_docker.git has been cloned into $FRAPPE_DOCKER_DIR."
+  git clone https://github.com/clicktrend/frappe_docker.git $FRAPPE_DOCKER_DIR
+  echo "Repository https://github.com/clicktrend/frappe_docker.git has been cloned into $FRAPPE_DOCKER_DIR."
 fi
