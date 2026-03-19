@@ -84,8 +84,7 @@ To release a new version:
 
 1. Pull latest scripts and update the frappe_docker fork:
    ```bash
-   git pull
-   git -C .frappe_docker pull
+   scripts/update.sh
    ```
 2. Update `apps.json` if app versions changed
 3. Bump `ERPNEXT_CUSTOM_TAG` in `.env`
