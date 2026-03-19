@@ -62,6 +62,7 @@ sed -i "s/SITES=\`erp.example.com\`/SITES=\`$SITES\`/g" $ERPNEXT_TARGET_ENV_FILE
 PROJECT_NAME="erpnext-$(echo "$SITES" | tr '.' '-')"
 echo "ROUTER=$PROJECT_NAME" >> $ERPNEXT_TARGET_ENV_FILE
 echo "BENCH_NETWORK=$PROJECT_NAME" >> $ERPNEXT_TARGET_ENV_FILE
+echo "SITES_RULE=Host(\`$SITES\`)" >> $ERPNEXT_TARGET_ENV_FILE
 
 echo "The file $ERPNEXT_TARGET_ENV_FILE has been successfully created."
 
