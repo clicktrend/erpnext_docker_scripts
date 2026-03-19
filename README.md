@@ -82,22 +82,27 @@ scripts/erpnext-custom-docker.sh up
 
 To release a new version:
 
-1. Update `apps.json` if app versions changed
-2. Bump `ERPNEXT_CUSTOM_TAG` in `.env`
-3. Build and regenerate the compose config:
+1. Pull latest scripts and update the frappe_docker fork:
+   ```bash
+   git pull
+   git -C .frappe_docker pull
+   ```
+2. Update `apps.json` if app versions changed
+3. Bump `ERPNEXT_CUSTOM_TAG` in `.env`
+4. Build and regenerate the compose config:
    ```bash
    scripts/erpnext-custom-setup.sh
    ```
-4. Restart ERPNext:
+5. Restart ERPNext:
    ```bash
    scripts/erpnext-custom-docker.sh restart
    ```
-5. Run migrations and rebuild assets:
+6. Run migrations and rebuild assets:
    ```bash
    scripts/erpnext-backend.sh bench migrate
    scripts/erpnext-backend.sh bench build
    ```
-6. Restart again to apply the build:
+7. Restart again to apply the build:
    ```bash
    scripts/erpnext-custom-docker.sh restart
    ```
