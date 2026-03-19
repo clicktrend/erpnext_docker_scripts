@@ -68,7 +68,23 @@ Verify in the Traefik dashboard that the ERPNext router has been registered.
 
 ## Custom Image
 
-Use a custom image to include additional Frappe apps (defined in `apps.json`).
+Apps are defined in `apps.json` and baked into the Docker image at build time. Private repos (e.g. GitLab) require an SSH deploy key.
+
+### SSH Deploy Key for Private Repos
+
+**Once on the server:**
+
+```bash
+ssh-keygen -t ed25519 -C 'erpnext-build-deploy-key' -f .configs/deploy_key -N ''
+cat .configs/deploy_key.pub
+```
+
+Add the printed public key as a **read-only Deploy Key** in GitLab under\
+`Settings → Repository → Deploy keys`.
+
+The private key at `.configs/deploy_key` is automatically picked up by `scripts/erpnext-custom-setup.sh` as a Docker BuildKit secret — it is never baked into the image.
+
+### Build and Start
 
 ```bash
 scripts/erpnext-custom-setup.sh   # build the custom image and generate compose config
