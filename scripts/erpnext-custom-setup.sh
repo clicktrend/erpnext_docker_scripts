@@ -71,6 +71,7 @@ echo "Backend image has been successfully built."
 echo "Building the custom image..."
 docker build \
   --build-arg=APPS_JSON_BASE64=$APPS_JSON_BASE64 \
+  --build-arg=CACHEBUST=$(date +%s) \
   --tag=$ERPNEXT_CUSTOM_IMAGE:$ERPNEXT_CUSTOM_TAG \
   --file=images/layered/Dockerfile \
   $FRAPPE_DOCKER_DIR

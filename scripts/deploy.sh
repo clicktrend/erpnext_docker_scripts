@@ -61,7 +61,7 @@ confirm "Start build?" || { echo "Aborted."; exit 0; }
 
 # ── Step 4: Build ──────────────────────────────────────────────────────────────
 step "4/7  Build custom image + generate compose"
-scripts/erpnext-custom-setup.sh || { echo "Build failed. Aborting."; exit 1; }
+scripts/erpnext-custom-setup.sh --fresh || { echo "Build failed. Aborting."; exit 1; }
 
 # ── Step 5: Restart ────────────────────────────────────────────────────────────
 step "5/7  Restart ERPNext"

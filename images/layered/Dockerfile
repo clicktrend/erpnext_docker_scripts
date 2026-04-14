@@ -24,6 +24,9 @@ RUN cd /home/frappe/frappe-bench/apps && \
         fi \
     done
 
+# Cache-bust arg — ensures frontend is always rebuilt fresh on deploy
+ARG CACHEBUST=1
+
 # Build React frontend (adomio workstation SPA)
 # Output goes to adomio/public/frontend/ → served via sites/assets/adomio/frontend/
 RUN if [ -f /home/frappe/frappe-bench/apps/adomio/frontend/package.json ]; then \
