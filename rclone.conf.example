@@ -1,0 +1,16 @@
+# Copy to /opt/erpnext_docker_scripts/.configs/rclone.conf on the prod host and
+# fill in the IAM access key/secret. .configs/ is git-ignored and NOT synced by
+# `./scripts/deploy sync`, so secrets stay on the server only.
+[s3backup]
+type = s3
+provider = AWS
+env_auth = false
+access_key_id = AKIA_REPLACE_ME
+secret_access_key = REPLACE_ME
+region = eu-central-1
+location_constraint = eu-central-1
+server_side_encryption = AES256
+# write-only IAM user (no CreateBucket / no GetObject): skip the bucket-existence
+# check and the post-upload HEAD integrity check on upload
+no_check_bucket = true
+no_head = true

@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily ERPNext database backup to S3
+
+[Timer]
+# 02:30 UTC daily; Persistent catches up a missed run after downtime.
+OnCalendar=*-*-* 02:30:00 UTC
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target
