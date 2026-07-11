@@ -6,11 +6,10 @@
 # restore) to S3 via rclone. Designed to be run by the erpnext-backup.timer
 # systemd unit.
 #
-# Disk-safe: the DB dump is a few MB and is streamed out of the container with
-# `docker exec cat`, so nothing large is staged on the (currently near-full)
-# host disk. File/attachment backups are intentionally NOT done here yet -- they
-# would create multi-GB tarballs locally; enable only after the host disk has
-# headroom (see README).
+# The DB dump (and, when BACKUP_FILES=1, the attachment tarballs) are streamed
+# out of the backend container into a temp dir and uploaded in a single
+# `rclone copy`. The tarballs are small here; for a very large attachment store
+# note the temp dir lives on the host disk.
 #
 # The IAM user is write-only (s3:PutObject + s3:ListBucket, no Delete/Get). So:
 #   - uploads use --no-check-dest (no HEAD on destination -> no GetObject needed)
@@ -37,6 +36,7 @@ BENCH_DIR="/home/frappe/frappe-bench"
 RCLONE_REMOTE="s3backup"
 S3_BUCKET="backup-erp-adomio-com"
 S3_PREFIX="db"
+BACKUP_FILES="0"
 ENABLE_S3_PRUNE="0"
 RETENTION_DAYS="30"
 
@@ -56,8 +56,10 @@ STAGE_DIR="$(mktemp -d /tmp/erpnext-backup.XXXXXX)"
 cleanup() { rm -rf "$STAGE_DIR"; }
 trap cleanup EXIT
 
-log "creating DB backup for $SITE ..."
-"${DC[@]}" exec -T backend bench --site "$SITE" backup >/dev/null \
+BACKUP_ARGS=(--site "$SITE" backup)
+[ "${BACKUP_FILES:-0}" = "1" ] && BACKUP_ARGS+=(--with-files)
+log "creating backup for $SITE (with-files=${BACKUP_FILES:-0}) ..."
+"${DC[@]}" exec -T backend bench "${BACKUP_ARGS[@]}" >/dev/null \
   || fail "bench backup failed"
 
 # Newest DB dump + its matching site_config backup (same timestamp prefix).
@@ -72,6 +74,17 @@ CFGNAME="$(basename "$CFGFILE")"
 log "streaming $DBNAME out of container ..."
 "${DC[@]}" exec -T backend cat "$DBFILE" > "$STAGE_DIR/$DBNAME"
 "${DC[@]}" exec -T backend cat "$CFGFILE" > "$STAGE_DIR/$CFGNAME" 2>/dev/null || true
+
+# Attachment tarballs (public + private files), if requested and present.
+if [ "${BACKUP_FILES:-0}" = "1" ]; then
+  for suffix in files.tar private-files.tar; do
+    SRC="${PREFIX}-${suffix}"
+    if "${DC[@]}" exec -T backend test -f "$SRC"; then
+      log "streaming $(basename "$SRC") out of container ..."
+      "${DC[@]}" exec -T backend cat "$SRC" > "$STAGE_DIR/$(basename "$SRC")"
+    fi
+  done
+fi
 
 [ -s "$STAGE_DIR/$DBNAME" ] || fail "streamed dump is empty"
 gzip -t "$STAGE_DIR/$DBNAME" || fail "streamed dump failed gzip integrity check"

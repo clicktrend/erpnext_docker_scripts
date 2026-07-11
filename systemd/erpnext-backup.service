@@ -3,6 +3,7 @@ Description=ERPNext database backup to S3
 Wants=network-online.target
 After=network-online.target docker.service
 Requires=docker.service
+OnFailure=erpnext-backup-alert@%n.service
 
 [Service]
 Type=oneshot
