@@ -1,0 +1,13 @@
+[Unit]
+Description=ERPNext database backup to S3
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/erpnext_docker_scripts/scripts/erpnext-s3-backup.sh
+Nice=10
+IOSchedulingClass=idle
+# Backups are non-critical background work; don't hold up boot or spam alerts.
+TimeoutStartSec=1800
