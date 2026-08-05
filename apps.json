@@ -32,7 +32,7 @@
     "branch": "develop"
   },
   {
-    "url": "git@gitlab.com:clicktrend/timeclock.git",
+    "url": "https://github.com/clicktrend/frappe_timeclock.git",
     "branch": "main"
   }
 ]
