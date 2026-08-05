@@ -10,5 +10,29 @@
   {
     "url": "git@gitlab.com:clicktrend/adomio_erpnext_app.git",
     "branch": "develop"
+  },
+  {
+    "url": "https://github.com/alyf-de/erpnext_germany.git",
+    "branch": "version-16"
+  },
+  {
+    "url": "https://github.com/alyf-de/erpnext_datev.git",
+    "branch": "version-16"
+  },
+  {
+    "url": "https://github.com/alyf-de/eu_einvoice.git",
+    "branch": "version-16"
+  },
+  {
+    "url": "https://github.com/frappe/print_designer.git",
+    "branch": "main"
+  },
+  {
+    "url": "https://github.com/clicktrend/erpnext_finapi.git",
+    "branch": "develop"
+  },
+  {
+    "url": "git@gitlab.com:clicktrend/timeclock.git",
+    "branch": "main"
   }
 ]
