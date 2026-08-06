@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<!-- Auto-retry: reload every 20s so the browser lands back in the app the moment it returns -->
+<meta http-equiv="refresh" content="20">
+<title>Wartung — Adomio ERP</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f5f6f8; --fg: #1f2937; --muted: #6b7280; --accent: #2563eb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #111827; --fg: #f3f4f6; --muted: #9ca3af; --accent: #60a5fa; }
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--bg); color: var(--fg);
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    padding: 2rem; text-align: center;
+  }
+  .card { max-width: 26rem; }
+  .spinner {
+    width: 3rem; height: 3rem; margin: 0 auto 1.5rem;
+    border: 4px solid var(--muted); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 1s linear infinite; opacity: .8;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  h1 { font-size: 1.4rem; margin-bottom: .75rem; }
+  p { color: var(--muted); line-height: 1.6; }
+  .brand { margin-top: 2rem; font-size: .8rem; color: var(--muted); opacity: .7; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="spinner" aria-hidden="true"></div>
+    <h1>Kurze Wartungspause</h1>
+    <p>Das System wird gerade aktualisiert und ist gleich wieder da.<br>
+       Diese Seite lädt automatisch neu — du musst nichts tun.</p>
+    <p class="brand">Adomio ERP · erp.adomio.com</p>
+  </div>
+</body>
+</html>

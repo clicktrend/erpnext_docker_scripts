@@ -1,15 +1,22 @@
 #!/bin/bash
-# Usage: scripts/erpnext-custom-setup.sh [--fresh]
-#   --fresh  Rebuild base image without Docker cache (forces fresh git clone of all apps)
+# Usage: scripts/erpnext-custom-setup.sh [--fresh] [--config-only]
+#   --fresh        Rebuild base image without Docker cache (forces fresh git clone of all apps)
+#   --config-only  Skip image builds, only regenerate the compose file (e.g. after
+#                  changing compose/compose.prod-extras.yaml)
 
 # Source the common file
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
 FRESH_BUILD=false
+CONFIG_ONLY=false
 for arg in "$@"; do
   if [ "$arg" = "--fresh" ]; then
     FRESH_BUILD=true
     echo "⚡ --fresh: Base image will be rebuilt without Docker cache."
+  fi
+  if [ "$arg" = "--config-only" ]; then
+    CONFIG_ONLY=true
+    echo "⚡ --config-only: Skipping image builds, regenerating compose file only."
   fi
 done
 
@@ -44,6 +51,8 @@ if [ ! -f "$DEPLOY_KEY_FILE" ]; then
   echo "Deploy key not found at $DEPLOY_KEY_FILE. Aborting."
   exit 1
 fi
+
+if [ "$CONFIG_ONLY" = false ]; then
 
 echo "Building the backend image..."
 NO_CACHE_FLAG=""
@@ -82,17 +91,22 @@ if [ $? -ne 0 ]; then
 fi
 echo "Custom image has been successfully built."
 
+fi  # CONFIG_ONLY
+
 # Step 3: Export environment variables
 export CUSTOM_IMAGE=$ERPNEXT_CUSTOM_IMAGE
 export CUSTOM_TAG=$ERPNEXT_CUSTOM_TAG
 export PULL_POLICY='never'
 
 # Step 4: Generate Docker Compose configuration
+# compose/compose.prod-extras.yaml: wkhtmltopdf host-gateway alias + maintenance
+# errors-middleware wiring (see comments in that file)
 docker compose --project-name erpnext --env-file .env --env-file $ERPNEXT_TARGET_ENV_FILE \
   -f $FRAPPE_DOCKER_DIR/compose.yaml \
   -f $FRAPPE_DOCKER_DIR/overrides/compose.redis.yaml \
   -f $FRAPPE_DOCKER_DIR/overrides/compose.multi-bench.yaml \
-  -f $FRAPPE_DOCKER_DIR/overrides/compose.multi-bench-ssl.yaml config > $ERPNEXT_CUSTOM_TARGET_YAML_FILE
+  -f $FRAPPE_DOCKER_DIR/overrides/compose.multi-bench-ssl.yaml \
+  -f compose/compose.prod-extras.yaml config > $ERPNEXT_CUSTOM_TARGET_YAML_FILE
 
 # Step 5: Unset environment variables
 unset CUSTOM_IMAGE

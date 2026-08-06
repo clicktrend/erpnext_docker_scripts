@@ -1,0 +1,45 @@
+# Maintenance page for the ERPNext site — part of the TRAEFIK stack (third -f in
+# traefik-docker.sh), so it is always up, independent of the ERPNext stack.
+#
+# Two mechanisms, no manual switching:
+#   1. Fallback router: same Host() rule as ERPNext but priority 1. Traefik's
+#      docker provider drops the ERPNext router the moment the frontend
+#      container stops (deploy, crash) — then this router takes over, including
+#      TLS with the already-issued Let's Encrypt cert.
+#   2. errors middleware (maintenance-errors): defined here, attached to the
+#      ERPNext https router in compose/compose.prod-extras.yaml. Covers the
+#      window where the frontend container is up but the backend answers
+#      502-504 (gunicorn still starting).
+#
+# ${PWD} works because traefik-docker.sh always cds to the repo root first.
+services:
+  maintenance:
+    image: nginx:alpine
+    restart: unless-stopped
+    volumes:
+      - ${PWD}/maintenance/index.html:/usr/share/nginx/html/index.html:ro
+      - ${PWD}/maintenance/default.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - traefik-public
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-public
+      # http: redirect to https like the real site (middleware defined on the traefik container)
+      - traefik.http.routers.maintenance-http.rule=Host(`${MAINTENANCE_DOMAIN:-erp.adomio.com}`)
+      - traefik.http.routers.maintenance-http.priority=1
+      - traefik.http.routers.maintenance-http.entrypoints=http
+      - traefik.http.routers.maintenance-http.middlewares=https-redirect
+      - traefik.http.routers.maintenance-http.service=maintenance
+      # https: priority 1 loses against the ERPNext router (default priority = rule
+      # length, ~23) whenever that router exists — i.e. this only serves during downtime
+      - traefik.http.routers.maintenance-https.rule=Host(`${MAINTENANCE_DOMAIN:-erp.adomio.com}`)
+      - traefik.http.routers.maintenance-https.priority=1
+      - traefik.http.routers.maintenance-https.entrypoints=https
+      - traefik.http.routers.maintenance-https.tls=true
+      - traefik.http.routers.maintenance-https.tls.certresolver=le
+      - traefik.http.routers.maintenance-https.service=maintenance
+      # errors middleware serving this container's page for gateway errors
+      - traefik.http.middlewares.maintenance-errors.errors.status=502-504
+      - traefik.http.middlewares.maintenance-errors.errors.service=maintenance
+      - traefik.http.middlewares.maintenance-errors.errors.query=/
+      - traefik.http.services.maintenance.loadbalancer.server.port=80

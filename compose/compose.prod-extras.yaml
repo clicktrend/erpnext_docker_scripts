@@ -1,0 +1,29 @@
+# Site-specific additions merged into the generated ERPNext compose file
+# (added as extra -f in the `docker compose config` step of erpnext-custom-setup.sh).
+#
+# extra_hosts: wkhtmltopdf (Get PDF) fetches CSS/images from the public site URL.
+# From inside the containers, erp.adomio.com resolves to the public IP and the
+# hairpin route dies (connection refused, curl code 000) — so ALL server-side
+# PDFs were broken. host-gateway points the name at the docker host, where
+# Traefik publishes 80/443. Applied to every service that renders PDFs
+# (backend = direct downloads, workers = queued mails/bulk, scheduler = auto-email).
+#
+# frontend labels: attach the maintenance-errors middleware (defined in
+# compose/compose.maintenance.yaml on the traefik stack) to the ERPNext router,
+# so backend 502-504s show the maintenance page instead of a bare gateway error.
+services:
+  backend:
+    extra_hosts:
+      - erp.adomio.com:host-gateway
+  queue-short:
+    extra_hosts:
+      - erp.adomio.com:host-gateway
+  queue-long:
+    extra_hosts:
+      - erp.adomio.com:host-gateway
+  scheduler:
+    extra_hosts:
+      - erp.adomio.com:host-gateway
+  frontend:
+    labels:
+      traefik.http.routers.erpnext-erp-adomio-com-https.middlewares: maintenance-errors@docker

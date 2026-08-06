@@ -9,6 +9,9 @@ if [ ! -f "$TRAEFIK_TARGET_ENV_FILE" ]; then
     exit 1
 fi
 
+# Maintenance page container (fallback router + errors middleware), lives in this repo
+TRAEFIK_COMPOSE_FILE_3="${TRAEFIK_COMPOSE_FILE_3:-compose/compose.maintenance.yaml}"
+
 # Function to run the Docker Compose command
 run_docker_compose() {
   local ACTION=$1
@@ -17,29 +20,34 @@ run_docker_compose() {
       docker compose --project-name $TRAEFIK_PROJECT_NAME \
         --env-file $TRAEFIK_TARGET_ENV_FILE \
         -f $TRAEFIK_COMPOSE_FILE_1 \
-        -f $TRAEFIK_COMPOSE_FILE_2 up -d
+        -f $TRAEFIK_COMPOSE_FILE_2 \
+        -f $TRAEFIK_COMPOSE_FILE_3 up -d
       ;;
     down)
       docker compose --project-name $TRAEFIK_PROJECT_NAME \
         --env-file $TRAEFIK_TARGET_ENV_FILE \
         -f $TRAEFIK_COMPOSE_FILE_1 \
-        -f $TRAEFIK_COMPOSE_FILE_2 down
+        -f $TRAEFIK_COMPOSE_FILE_2 \
+        -f $TRAEFIK_COMPOSE_FILE_3 down
       ;;
     logs)
       docker compose --project-name $TRAEFIK_PROJECT_NAME \
         --env-file $TRAEFIK_TARGET_ENV_FILE \
         -f $TRAEFIK_COMPOSE_FILE_1 \
-        -f $TRAEFIK_COMPOSE_FILE_2 logs -f
+        -f $TRAEFIK_COMPOSE_FILE_2 \
+        -f $TRAEFIK_COMPOSE_FILE_3 logs -f
       ;;
     restart)
       docker compose --project-name $TRAEFIK_PROJECT_NAME \
         --env-file $TRAEFIK_TARGET_ENV_FILE \
         -f $TRAEFIK_COMPOSE_FILE_1 \
-        -f $TRAEFIK_COMPOSE_FILE_2 down
+        -f $TRAEFIK_COMPOSE_FILE_2 \
+        -f $TRAEFIK_COMPOSE_FILE_3 down
       docker compose --project-name $TRAEFIK_PROJECT_NAME \
         --env-file $TRAEFIK_TARGET_ENV_FILE \
         -f $TRAEFIK_COMPOSE_FILE_1 \
-        -f $TRAEFIK_COMPOSE_FILE_2 up -d
+        -f $TRAEFIK_COMPOSE_FILE_2 \
+        -f $TRAEFIK_COMPOSE_FILE_3 up -d
       ;;
     *)
       echo "Invalid action: $ACTION"
