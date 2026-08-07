@@ -45,16 +45,37 @@ RETENTION_DAYS="30"
 export RCLONE_CONFIG="${RCLONE_CONFIG:-$ROOT_DIR/.configs/rclone.conf}"
 
 log() { echo "$(date -u +'%Y-%m-%dT%H:%M:%SZ') [erpnext-s3-backup] $*"; }
-fail() { log "ERROR: $*"; exit 1; }
+
+# --- Dead-man switch -------------------------------------------------------
+# HEALTHCHECK_URL (see .configs/alerts.env) is an external check-in URL. We ping
+# /start on entry, the bare URL on success, /fail on a handled error.
+#
+# This covers a failure mode that OnFailure= structurally cannot: a run that
+# never happens at all -- timer disabled, host down, or the unit failing to even
+# exec this script. That is not hypothetical; on 2026-08-07 the unit died with
+# exit 203 (could not execute), so nothing inside this file ever ran.
+#
+# Ping failures are swallowed: monitoring must never break the backup.
+hc_ping() {
+  [ -n "${HEALTHCHECK_URL:-}" ] || return 0
+  local suffix="${1:-}"
+  curl -fsS -m 10 -o /dev/null --retry 2 "${HEALTHCHECK_URL}${suffix:+/$suffix}" 2>/dev/null || true
+}
+
+fail() { log "ERROR: $*"; hc_ping fail; exit 1; }
 
 command -v rclone >/dev/null 2>&1 || fail "rclone not installed on host"
 [ -f "$RCLONE_CONFIG" ] || fail "rclone config not found: $RCLONE_CONFIG"
 
 DC=(docker compose --project-name "$PROJECT_NAME")
 
+hc_ping start
+
 STAGE_DIR="$(mktemp -d /tmp/erpnext-backup.XXXXXX)"
 cleanup() { rm -rf "$STAGE_DIR"; }
-trap cleanup EXIT
+# `set -e` aborts (which do not go through fail()) must report too, otherwise
+# the check-in stays "started" forever and the alert reason is misleading.
+trap 'rc=$?; if [ "$rc" -ne 0 ]; then hc_ping fail; fi; cleanup' EXIT
 
 BACKUP_ARGS=(--site "$SITE" backup)
 [ "${BACKUP_FILES:-0}" = "1" ] && BACKUP_ARGS+=(--with-files)
@@ -111,3 +132,4 @@ if [ "${ENABLE_S3_PRUNE:-0}" = "1" ]; then
 fi
 
 log "done: $DBNAME uploaded to s3://$S3_BUCKET/$S3_PREFIX/$(date -u +%Y/%m)/"
+hc_ping

@@ -1,0 +1,12 @@
+[Unit]
+Description=ERPNext host disk watchdog (alerts on threshold crossing)
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/erpnext_docker_scripts/scripts/disk-watch.sh
+Nice=10
+IOSchedulingClass=idle
+# The watchdog must never be the reason something breaks: it exits 0 by design,
+# and a hang is capped rather than left to pile up timer instances.
+TimeoutStartSec=120

@@ -1,0 +1,13 @@
+[Unit]
+Description=Run the ERPNext disk watchdog every 15 minutes
+
+[Timer]
+OnCalendar=*:0/15
+# Spread load away from the exact quarter-hour (backup, cron, scheduler).
+RandomizedDelaySec=60
+# A missed window after downtime should still be checked -- a host that just
+# came back is exactly when the disk is worth looking at.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

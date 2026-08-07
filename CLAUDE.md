@@ -79,4 +79,53 @@ Tag version is controlled by `ERPNEXT_CUSTOM_TAG` in `.env`. The generated compo
 
 ## Backup
 
-Backups are handled entirely by ERPNext's built-in scheduler and backup feature (configured under **Settings → Backups** in the ERPNext UI). No external scripts or cron jobs are needed.
+Two independent layers — do not confuse them when diagnosing:
+
+1. **In-site backups** — ERPNext's own scheduler writes to
+   `sites/erp.adomio.com/private/backups` inside the backend container. Configured in the ERPNext UI
+   under **Settings → Backups**. Stays on the host disk.
+2. **Offsite to S3** — `scripts/erpnext-s3-backup.sh`, driven by `systemd/erpnext-backup.timer`
+   (02:30 UTC daily). Streams the dump out of the container and uploads via rclone with a
+   write-only IAM user; retention is an S3 lifecycle rule, not a client-side prune.
+
+Layer 1 can be perfectly healthy while layer 2 is dead — that is exactly what happened on
+2026-08-07 (unit `exit 203`, i.e. systemd could not even exec the script).
+
+## Alerting
+
+One dispatcher, three sources. Config lives in `.configs/alerts.env` (git-ignored, **not** copied by
+`deploy sync` — create it on the server; template: `alerts.env.example`).
+
+- **`scripts/notify.sh <info|warn|crit> <subject> [body]`** — the only place that knows where alerts
+  go. Telegram first-class, optional generic webhook, always mirrors to the journal
+  (`journalctl -t erpnext-notify`). Exits 0 unconditionally: a broken alert channel must never take
+  down the job it watches, nor mask its exit code.
+- **Backup failure** — `systemd/erpnext-backup.service` has `OnFailure=erpnext-backup-alert@%n.service`
+  → `scripts/erpnext-backup-alert.sh` → `notify.sh`.
+- **Backup dead-man switch** — `HEALTHCHECK_URL` in `alerts.env`. `erpnext-s3-backup.sh` pings
+  `/start`, then the bare URL on success and `/fail` on error.
+  **This is not redundant with `OnFailure=`:** that only fires when the unit *runs and fails*. It
+  cannot fire when the run never happens (timer disabled, host down, unit unable to exec the script).
+  The 2026-08-07 outage was exactly that case and reached nobody.
+- **Disk** — `scripts/disk-watch.sh` via `systemd/erpnext-disk-watch.timer` (every 15 min).
+  Alerts on threshold *crossing* only (state in `/var/lib/erpnext-alerts/`), so a standing condition
+  does not repeat every quarter hour; sends one recovery notice. Includes the top disk consumers and
+  the prune commands in the message so the alert is actionable.
+
+Test the chain end-to-end with:
+
+```bash
+scripts/notify.sh info "Testalarm" "ausgeloest von Hand"
+```
+
+Installing the timers after a `deploy sync`:
+
+```bash
+cp systemd/*.service systemd/*.timer /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now erpnext-disk-watch.timer
+systemctl list-timers --all | grep erpnext
+```
+
+Concept and roadmap (own monitoring stack, phases 1–3):
+`docs/plans/2026-08-07-erpnext-monitoring-eigenbau.md` in the parent repo.
