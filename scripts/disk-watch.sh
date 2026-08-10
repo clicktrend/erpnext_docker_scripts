@@ -62,11 +62,19 @@ case "$INODE_PCT" in
      fi ;;
 esac
 
-# Biggest consumers, so the alert is actionable instead of merely alarming.
+# Where the space went, so the alert is actionable instead of merely alarming.
+#
+# Everything in the alert path MUST be time-bounded. The first version ran
+# `du -x --max-depth=1 /var/lib/docker` here; on the real host that tree is
+# ~100 GB across a huge overlay2 file count and the walk takes minutes -- long
+# enough for systemd's TimeoutStartSec to kill the unit before the alert was
+# ever sent. A watchdog that hangs exactly when it should fire is worse than
+# none. `docker system df` reads Docker's own bookkeeping instead: ~0.6 s on
+# the same host, and it reports the reclaimable share, which is the number
+# somebody actually acts on.
 top_consumers() {
-  du -xh --max-depth=1 /var/lib/docker 2>/dev/null | sort -rh | head -4
-  echo "--"
-  docker system df 2>/dev/null | sed -n '1,5p'
+  timeout 15 docker system df 2>/dev/null \
+    || echo "(docker system df lieferte nicht rechtzeitig - Host pruefen)"
 }
 
 if [ "$LEVEL" != "$PREV" ]; then
