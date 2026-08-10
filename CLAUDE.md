@@ -77,6 +77,35 @@ Tag version is controlled by `ERPNEXT_CUSTOM_TAG` in `.env`. The generated compo
 3. Run `scripts/erpnext-custom-setup.sh` (builds and regenerates compose file)
 4. Restart + migrate (see Key Commands above)
 
+## Housekeeping (disk)
+
+The build runs `--no-cache`, so **every deploy adds a complete new layer set** —
+~4.6 GB custom + ~3.8 GB base + a fresh build cache — and nothing used to remove the old ones.
+That is how the host reached 59 images / 84 GB and 88 % disk on 2026-08-10, with 19 GB left; a full
+disk corrupts MariaDB. Manual cleanup freed 99 GB.
+
+`scripts/deploy.sh` therefore ends with step 9, `scripts/prune-images.sh`:
+
+```bash
+scripts/prune-images.sh --dry-run     # preview, changes nothing
+scripts/prune-images.sh               # prune
+KEEP_RELEASES=5 scripts/prune-images.sh
+```
+
+- Keeps every image backing a running container, `base:latest` (input for the next build), and the
+  `KEEP_RELEASES` (default 3) most recent tags per managed repository. The running image is
+  protected separately and does **not** consume that budget.
+- Touches only `$ERPNEXT_CUSTOM_IMAGE` and `base`. Unrelated images (traefik, mariadb, leftovers)
+  are deliberately out of scope — an automatic cleanup should only delete what its own pipeline made.
+- Never passes `--force`, so anything still referenced survives and merely reports a conflict.
+- Also prunes dangling images, the build cache (worthless with `--no-cache`) and **anonymous**
+  volumes. Without `--all`, named volumes (`erpnext_sites`, `mariadb_db-data`) are out of reach by
+  construction.
+- Always exits 0: housekeeping must never turn a successful deploy into a failed one.
+
+**It is the last step on purpose.** Every `exit 1` earlier in `deploy.sh` leaves the previous image
+intact, which is exactly what a rollback needs — only a deploy that reached the end may discard it.
+
 ## Backup
 
 Two independent layers — do not confuse them when diagnosing:
