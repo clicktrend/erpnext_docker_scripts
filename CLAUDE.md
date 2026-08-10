@@ -100,10 +100,21 @@ rebuild, a new tag and ~8 GB of fresh layers (~30 min). That difference decides 
 ever gets tuned again. The Dockerfile CMD remains the fallback when the image runs without this
 compose file.
 
-All of the above is live and restart-proof as of 2026-08-10. Verified after the restart: gunicorn
-runs 6 processes (1 master + 5 workers), redis-cache reports the ceiling and `allkeys-lru` with RDB
-off, redis-queue is untouched, the InnoDB pool is still 3 GiB, the scheduler is active, and the
-storefront answers in 0.66 s.
+All of the above is live as of 2026-08-10. Verified after the restart: gunicorn runs 6 processes
+(1 master + 5 workers), redis-cache reports the ceiling and `allkeys-lru` with RDB off, redis-queue
+is untouched, the InnoDB pool is 3 GiB, the scheduler is active, and the storefront answers in
+0.66 s.
+
+> ⚠️ **The InnoDB settings survive a *recreate*, not a bare restart.** The running
+> `mariadb-database` container has its CMD frozen from when it was created (2026-04-05) and that CMD
+> carries none of the tuning flags — the 3 GiB pool is currently a live `SET GLOBAL`. So:
+>
+> - `scripts/mariadb-docker.sh up` / `restart` → container is recreated, picks up
+>   `compose.mariadb-tuning.yaml`, keeps 3 GiB. ✅
+> - `docker restart mariadb-database` → same container, old CMD, **silently back to 128 MiB**. ❌
+>
+> The gunicorn and redis settings do not have this problem: those containers were recreated during
+> the 2026-08-10 restart and already carry the new command.
 
 > 🔴 **MariaDB version pin — read before restarting that stack.** The upstream
 > `.frappe_docker/overrides/compose.mariadb-shared.yaml` has moved to `mariadb:11.8`, while this host
