@@ -56,10 +56,24 @@ log() { echo "$(date -u +'%Y-%m-%dT%H:%M:%SZ') [erpnext-s3-backup] $*"; }
 # exit 203 (could not execute), so nothing inside this file ever ran.
 #
 # Ping failures are swallowed: monitoring must never break the backup.
+# A ping that silently goes nowhere is the worst outcome here: a typo in the
+# URL, a deleted check or a rotated ping key would leave the switch looking
+# healthy while watching nothing. So the HTTP status is checked and anything
+# other than 200 is made loud in the journal -- without ever failing the
+# backup itself, which is the whole point of the surrounding `|| return 0`.
+# (No `-f`: we want curl to hand us the real status code instead of erroring
+# out on 4xx, so 404 can be reported as 404 rather than a generic failure.)
 hc_ping() {
   [ -n "${HEALTHCHECK_URL:-}" ] || return 0
-  local suffix="${1:-}"
-  curl -fsS -m 10 -o /dev/null --retry 2 "${HEALTHCHECK_URL}${suffix:+/$suffix}" 2>/dev/null || true
+  local suffix="${1:-}" code
+  code=$(curl -sS -m 10 -o /dev/null -w '%{http_code}' --retry 2 \
+           "${HEALTHCHECK_URL}${suffix:+/$suffix}" 2>/dev/null) || code="000"
+  if [ "$code" != "200" ]; then
+    log "WARN: dead-man ping '${suffix:-success}' nicht angekommen (HTTP $code)"
+    logger -p daemon.err -t erpnext-s3-backup \
+      "dead-man ping '${suffix:-success}' failed (HTTP $code) -- HEALTHCHECK_URL in .configs/alerts.env pruefen"
+  fi
+  return 0
 }
 
 fail() { log "ERROR: $*"; hc_ping fail; exit 1; }
