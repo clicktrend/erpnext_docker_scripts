@@ -1,0 +1,44 @@
+# Site-specific MariaDB overrides, merged as a second -f in mariadb-docker.sh.
+#
+# It lives HERE and not in .frappe_docker/overrides/compose.mariadb-shared.yaml
+# because that file belongs to the upstream submodule and scripts/update.sh
+# overwrites it on every deploy. Same pattern as compose.prod-extras.yaml.
+#
+# ── 1. Version pin ───────────────────────────────────────────────────────────
+# The upstream file has moved on to `mariadb:11.8`, while this host has been
+# running 10.6 since it was set up. Combined with `MARIADB_AUTO_UPGRADE: 1`,
+# a plain `mariadb-docker.sh restart` would silently major-upgrade the database
+# engine across two versions -- discovered 2026-08-10. A major upgrade may be
+# the right move, but it is a planned migration with a backup and a rollback
+# path, never a side effect of restarting a container.
+#
+# ── 2. Tuning ────────────────────────────────────────────────────────────────
+# The container was started with no tuning flags at all, i.e. MariaDB defaults:
+# a 128 MiB buffer pool on a 15 GiB host, and innodb_io_capacity=200, which is
+# the default for a *spinning disk* while this host is on SSD. The database was
+# already 284 MB, so it did not fit in the pool, and prod has 0 GL entries so
+# far -- all of the growth is still ahead.
+#
+# Applied live on 2026-08-10 via SET GLOBAL (both are dynamic in 10.6); these
+# lines are what makes it survive a restart.
+#
+# `command:` REPLACES the upstream list rather than merging with it, so the four
+# original flags are repeated here. Dropping them would change the server's
+# character set behaviour.
+#
+# Deliberately NOT changed: innodb_flush_log_at_trx_commit stays at 1. It is the
+# only setting that guarantees a committed transaction survives a crash, and
+# this is accounting data. Also left alone: innodb_log_file_size (96 MB) -- a
+# larger redo log helps write-heavy phases but lengthens crash recovery, and
+# there is no write pressure yet to justify it.
+services:
+  database:
+    image: mariadb:10.6
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --skip-character-set-client-handshake
+      - --skip-innodb-read-only-compressed
+      - --innodb-buffer-pool-size=3G
+      - --innodb-io-capacity=1000
+      - --innodb-io-capacity-max=4000

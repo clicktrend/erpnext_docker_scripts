@@ -77,6 +77,40 @@ Tag version is controlled by `ERPNEXT_CUSTOM_TAG` in `.env`. The generated compo
 3. Run `scripts/erpnext-custom-setup.sh` (builds and regenerates compose file)
 4. Restart + migrate (see Key Commands above)
 
+## Tuning / dimensioning
+
+The stack shipped on defaults everywhere, on a machine far bigger than it used. Measured
+2026-08-10: 8 vCPU, 15 GB RAM — **all containers together 1.6 GB**.
+
+| What | Was | Now | Where it is persisted |
+|---|---|---|---|
+| Gunicorn workers | 2 (image CMD) | **5** | `compose/compose.prod-extras.yaml` |
+| `innodb_buffer_pool_size` | 128 MiB (default) | **3 GiB** | `compose/compose.mariadb-tuning.yaml` |
+| `innodb_io_capacity` / `_max` | 200 / 2000 (HDD default) | **1000 / 4000** | same |
+| Redis **cache** | `maxmemory 0` + `noeviction` | **1 GiB + allkeys-lru** | see caveat below |
+| Swap | none | **4 GiB**, `vm.swappiness=10` | `/etc/fstab`, `/etc/sysctl.d/99-erpnext-swap.conf` |
+
+**Deliberately unchanged:** `innodb_flush_log_at_trx_commit=1` — the only setting that guarantees a
+committed transaction survives a crash, and this is accounting data. Redis **queue** keeps
+`noeviction`: evicting a job means losing work silently.
+
+**Gunicorn lives in `compose.prod-extras.yaml`, not the Dockerfile.** A compose change is
+`erpnext-custom-setup.sh --config-only` + restart (~2 min); the Dockerfile needs a full `--no-cache`
+rebuild, a new tag and ~8 GB of fresh layers (~30 min). That difference decides whether the value
+ever gets tuned again. The Dockerfile CMD remains the fallback when the image runs without this
+compose file.
+
+> ⚠️ **Redis is not persisted yet.** `maxmemory` and the eviction policy were set at runtime via
+> `CONFIG SET` and are lost on the next container recreate. They still need a `command:` override for
+> the `redis-cache` service.
+
+> 🔴 **MariaDB version pin — read before restarting that stack.** The upstream
+> `.frappe_docker/overrides/compose.mariadb-shared.yaml` has moved to `mariadb:11.8`, while this host
+> runs **10.6**. With `MARIADB_AUTO_UPGRADE: 1`, a plain `mariadb-docker.sh restart` would silently
+> major-upgrade the engine across two versions. `compose/compose.mariadb-tuning.yaml` pins 10.6, and
+> `mariadb-docker.sh` merges it as a second `-f`. A major upgrade may well be right — but as a
+> planned migration with a backup and a rollback path, not as a side effect of a restart.
+
 ## Housekeeping (disk)
 
 The build runs `--no-cache`, so **every deploy adds a complete new layer set** —

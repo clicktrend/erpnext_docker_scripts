@@ -11,10 +11,41 @@
 # frontend labels: attach the maintenance-errors middleware (defined in
 # compose/compose.maintenance.yaml on the traefik stack) to the ERPNext router,
 # so backend 502-504s show the maintenance page instead of a bare gateway error.
+#
+# backend command: raises gunicorn from 2 workers to 5. The 2-worker value is
+# baked into images/layered/Dockerfile as the image CMD, and this host has 8
+# vCPU with all containers together using 1.6 GB of 15 GB -- the software was
+# throttled far below the machine it runs on. Two worker processes mean one slow
+# report or PDF render occupies half of all HTTP capacity.
+#
+# Overriding here rather than in the Dockerfile is deliberate: a compose change
+# needs `erpnext-custom-setup.sh --config-only` plus a restart (~2 min), while
+# the Dockerfile needs a full --no-cache rebuild, a new tag and ~8 GB of fresh
+# layers (~30 min). That difference decides whether this value ever gets tuned
+# again. The Dockerfile CMD stays as the fallback for anyone starting the image
+# without this compose file.
+#
+# --preload keeps the cost down: the app is loaded once in the master and
+# forked, measured ~300 MB per worker, so 5 workers land near 1.5 GB.
+# Everything else is copied verbatim from the image CMD -- only --workers moves,
+# so any effect is attributable to that one number. --timeout stays at 120 s;
+# raising it is a separate decision with its own trade-off (long requests hold a
+# worker hostage for longer).
 services:
   backend:
     extra_hosts:
       - erp.adomio.com:host-gateway
+    command:
+      - /home/frappe/frappe-bench/env/bin/gunicorn
+      - --chdir=/home/frappe/frappe-bench/sites
+      - --bind=0.0.0.0:8000
+      - --threads=4
+      - --workers=5
+      - --worker-class=gthread
+      - --worker-tmp-dir=/dev/shm
+      - --timeout=120
+      - --preload
+      - frappe.app:application
   queue-short:
     extra_hosts:
       - erp.adomio.com:host-gateway
