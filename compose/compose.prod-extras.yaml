@@ -55,6 +55,30 @@ services:
   scheduler:
     extra_hosts:
       - erp.adomio.com:host-gateway
+  # redis-cache ran on the image default: no memory ceiling and `noeviction`.
+  # That combination is a slow-burning fault -- the cache grows unbounded, and
+  # once it cannot allocate, redis starts returning errors instead of evicting,
+  # which surfaces as a broken site rather than a slow one. A cache is the one
+  # place where discarding the oldest entries is exactly the right answer, so:
+  # a ceiling plus allkeys-lru.
+  #
+  # --save "" turns off RDB snapshots for the cache only. Its contents are
+  # disposable by definition, and BGSAVE forks the process: with a 1 GiB ceiling
+  # that fork can transiently cost close to another gigabyte through
+  # copy-on-write, on a host that just handed 3 GiB to InnoDB.
+  #
+  # redis-queue deliberately gets NONE of this. Those keys are queued background
+  # jobs; evicting one loses work silently, which is far worse than running out
+  # of memory loudly.
+  redis-cache:
+    command:
+      - redis-server
+      - --maxmemory
+      - 1gb
+      - --maxmemory-policy
+      - allkeys-lru
+      - --save
+      - ""
   frontend:
     labels:
       traefik.http.routers.erpnext-erp-adomio-com-https.middlewares: maintenance-errors@docker

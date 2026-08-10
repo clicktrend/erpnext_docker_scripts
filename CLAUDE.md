@@ -87,7 +87,7 @@ The stack shipped on defaults everywhere, on a machine far bigger than it used. 
 | Gunicorn workers | 2 (image CMD) | **5** | `compose/compose.prod-extras.yaml` |
 | `innodb_buffer_pool_size` | 128 MiB (default) | **3 GiB** | `compose/compose.mariadb-tuning.yaml` |
 | `innodb_io_capacity` / `_max` | 200 / 2000 (HDD default) | **1000 / 4000** | same |
-| Redis **cache** | `maxmemory 0` + `noeviction` | **1 GiB + allkeys-lru** | see caveat below |
+| Redis **cache** | `maxmemory 0` + `noeviction`, RDB on | **1 GiB + allkeys-lru**, RDB off | `compose/compose.prod-extras.yaml` |
 | Swap | none | **4 GiB**, `vm.swappiness=10` | `/etc/fstab`, `/etc/sysctl.d/99-erpnext-swap.conf` |
 
 **Deliberately unchanged:** `innodb_flush_log_at_trx_commit=1` — the only setting that guarantees a
@@ -100,9 +100,10 @@ rebuild, a new tag and ~8 GB of fresh layers (~30 min). That difference decides 
 ever gets tuned again. The Dockerfile CMD remains the fallback when the image runs without this
 compose file.
 
-> ⚠️ **Redis is not persisted yet.** `maxmemory` and the eviction policy were set at runtime via
-> `CONFIG SET` and are lost on the next container recreate. They still need a `command:` override for
-> the `redis-cache` service.
+All of the above is live and restart-proof as of 2026-08-10. Verified after the restart: gunicorn
+runs 6 processes (1 master + 5 workers), redis-cache reports the ceiling and `allkeys-lru` with RDB
+off, redis-queue is untouched, the InnoDB pool is still 3 GiB, the scheduler is active, and the
+storefront answers in 0.66 s.
 
 > 🔴 **MariaDB version pin — read before restarting that stack.** The upstream
 > `.frappe_docker/overrides/compose.mariadb-shared.yaml` has moved to `mariadb:11.8`, while this host
