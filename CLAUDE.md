@@ -8,6 +8,32 @@ Bash script collection for managing an ERPNext production deployment on Docker C
 
 The production server is accessed via `ssh erpnext`. All containers run in `/opt/erpnext_docker_scripts/` on the server.
 
+## The server checkout (`/opt/erpnext_docker_scripts`)
+
+That directory is **both** a git checkout of this repo (branch `main`) **and** the target of
+`scripts/deploy sync`, which rsyncs the local working copy onto it. Two delivery paths into one
+directory — worth knowing before touching either.
+
+**Drift found and repaired 2026-08-10.** `HEAD` sat 16 commits behind `origin/main` while rsync had
+long since delivered the current files. Cause: `update.sh` runs `git pull` there, and that had been
+failing on `detected dubious ownership` — `.git` is root-owned, the working directory is `1000:1000`.
+`deploy.sh` does not check `update.sh`'s exit code, so step 1 printed an error and carried on;
+nobody noticed. Repair: every file was verified byte-identical to `origin/main` first (18 untracked
++ 6 apparently-modified, zero differences), then `git reset --hard origin/main` — a pure ref move,
+no file changed on disk. Plus:
+
+```bash
+git config --system --add safe.directory /opt/erpnext_docker_scripts
+```
+
+Both pulls in `update.sh` now succeed, so the drift cannot silently return.
+
+**What follows for the workflow:** now that `git pull` actually runs, rsync-only changes are no
+longer free. If `deploy sync` puts an uncommitted change on the server and `origin/main` later
+touches the same file, the next pull refuses to overwrite it and step 1 fails — loudly this time,
+which is the point. So: **commit and push to `main`, then sync.** `.configs/`, `.env` and
+`.frappe_docker/` are gitignored and excluded from the sync; they are server-only and unaffected.
+
 ## Key Commands
 
 All scripts must be run from the project root (they use `common.sh` which `cd`s to the root and sources `.env`).
