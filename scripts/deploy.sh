@@ -28,11 +28,11 @@ if [ ! -f "$DEPLOY_KEY_FILE" ]; then
 fi
 
 # ── Step 1: Update ─────────────────────────────────────────────────────────────
-step "1/8  Update scripts + frappe_docker"
+step "1/9  Update scripts + frappe_docker"
 scripts/update.sh
 
 # ── Step 2: apps.json review ───────────────────────────────────────────────────
-step "2/8  Review apps.json"
+step "2/9  Review apps.json"
 echo ""
 cat "$ERPNEXT_CUSTOM_APPS_JSON_FILE"
 echo ""
@@ -41,7 +41,7 @@ if confirm "Edit apps.json before building?"; then
 fi
 
 # ── Step 3: Bump version tag ───────────────────────────────────────────────────
-step "3/8  Version tag"
+step "3/9  Version tag"
 echo "Current ERPNEXT_CUSTOM_TAG: $ERPNEXT_CUSTOM_TAG"
 read -rp "New tag (leave empty to keep '$ERPNEXT_CUSTOM_TAG'): " NEW_TAG
 if [ -n "$NEW_TAG" ]; then
@@ -60,18 +60,18 @@ echo ""
 confirm "Start build?" || { echo "Aborted."; exit 0; }
 
 # ── Step 4: Build ──────────────────────────────────────────────────────────────
-step "4/8  Build custom image + generate compose"
+step "4/9  Build custom image + generate compose"
 scripts/erpnext-custom-setup.sh --fresh || { echo "Build failed. Aborting."; exit 1; }
 
 # ── Step 5: Restart ────────────────────────────────────────────────────────────
-step "5/8  Restart ERPNext"
+step "5/9  Restart ERPNext"
 scripts/erpnext-custom-docker.sh restart || { echo "Restart failed. Aborting."; exit 1; }
 
 # ── Step 6: Backup ─────────────────────────────────────────────────────────────
 # `bench migrate` is the point of no return: patches rename DocTypes and drop columns,
 # and there is no `migrate --undo`. The nightly S3 backup can be up to 24h old, which is
 # 24h of production work to re-enter by hand. So: take one immediately before.
-step "6/8  Backup site (DB + files) before migrating"
+step "6/9  Backup site (DB + files) before migrating"
 scripts/erpnext-backend.sh bench --site all backup --with-files || { echo "Backup failed. Aborting BEFORE migrate."; exit 1; }
 
 # A backup that silently wrote nothing is worse than no backup, because it buys false
@@ -87,13 +87,22 @@ docker compose --project-name "$ERPNEXT_PROJECT_NAME" exec -T backend bash -lc '
 ' || { echo "Backup verification failed. Aborting BEFORE migrate."; exit 1; }
 
 # ── Step 7: Migrate + Build assets ────────────────────────────────────────────
-step "7/8  Migrate + build assets"
+step "7/9  Migrate + build assets"
 scripts/erpnext-backend.sh bench migrate || { echo "Migration failed. Aborting."; exit 1; }
 scripts/erpnext-backend.sh bench build   || { echo "Asset build failed. Aborting."; exit 1; }
 
 # ── Step 8: Final restart ──────────────────────────────────────────────────────
-step "8/8  Final restart"
+step "8/9  Final restart"
 scripts/erpnext-custom-docker.sh restart || { echo "Restart failed."; exit 1; }
+
+# ── Step 9: Housekeeping ───────────────────────────────────────────────────────
+# Deliberately last. Every `exit 1` above leaves the previous image intact, which
+# is what a rollback needs; only a deploy that got this far may throw it away.
+# Because the build runs --no-cache, each deploy adds a full layer set (~8 GB
+# with its base) that nothing used to remove -- the host reached 88 % disk this
+# way. See scripts/prune-images.sh.
+step "9/9  Clean up old images"
+scripts/prune-images.sh || echo "  (Aufräumen übersprungen — Deploy ist davon unberührt)"
 
 echo ""
 echo "══════════════════════════════════════════"

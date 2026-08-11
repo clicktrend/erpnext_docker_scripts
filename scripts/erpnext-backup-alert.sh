@@ -25,14 +25,17 @@ logger -p daemon.err -t erpnext-backup "$MSG"
 LOGTAIL="$(journalctl -u "$UNIT" -n 25 --no-pager 2>/dev/null)"
 { echo "=== $MSG ==="; echo "$LOGTAIL"; echo; } >> "$LOGFILE" 2>/dev/null || true
 
-# 3) Optional webhook (Slack/Discord/Teams/healthchecks/...)
-if [ -n "${ALERT_WEBHOOK:-}" ]; then
-  curl -fsS -m 15 -X POST -H 'Content-Type: application/json' \
-    -d "{\"text\": \"$MSG\"}" "$ALERT_WEBHOOK" >/dev/null 2>&1 \
-    || logger -p daemon.err -t erpnext-backup "alert webhook POST failed"
-fi
+# 3) Outbound alert via the shared dispatcher (Telegram / webhook).
+#
+# Previously this file POSTed to ALERT_WEBHOOK and piped to `mail` directly.
+# Both were dead in practice: ALERT_WEBHOOK was never set and the host has no
+# MTA, so `command -v mail` skipped silently -- a failed backup on 2026-08-07
+# reached nobody. Routing through notify.sh means there is one place to
+# configure and one place to fix.
+"$SCRIPT_DIR/notify.sh" crit "ERPNext-Backup fehlgeschlagen: $UNIT" \
+  "$LOGTAIL" || true
 
-# 4) Optional email (needs a working MTA / mail command on the host)
+# 4) Optional email, kept as a belt-and-braces extra (needs an MTA on the host).
 if [ -n "${ALERT_EMAIL:-}" ] && command -v mail >/dev/null 2>&1; then
   printf '%s\n\n--- last 25 log lines ---\n%s\n' "$MSG" "$LOGTAIL" \
     | mail -s "[ALERT] ERPNext backup failed on $HOST" "$ALERT_EMAIL" \

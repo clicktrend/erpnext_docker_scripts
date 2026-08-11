@@ -3,6 +3,10 @@
 # Source the common file
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
+# Site-specific overrides (version pin + InnoDB tuning). Kept out of
+# .frappe_docker/, which scripts/update.sh overwrites on every deploy.
+MARIADB_TUNING_COMPOSE_FILE="$ROOT_DIR/compose/compose.mariadb-tuning.yaml"
+
 # Check if the environment file exists
 if [ ! -f "$MARIADB_TARGET_ENV_FILE" ]; then
     echo "The environment file $MARIADB_TARGET_ENV_FILE does not exist. Aborting."
@@ -16,25 +20,25 @@ run_docker_compose() {
     up)
       docker compose --project-name $MARIADB_PROJECT_NAME \
         --env-file $MARIADB_TARGET_ENV_FILE \
-        -f $MARIADB_COMPOSE_FILE_1 up -d
+        -f $MARIADB_COMPOSE_FILE_1 -f $MARIADB_TUNING_COMPOSE_FILE up -d
       ;;
     down)
       docker compose --project-name $MARIADB_PROJECT_NAME \
         --env-file $MARIADB_TARGET_ENV_FILE \
-        -f $MARIADB_COMPOSE_FILE_1 down
+        -f $MARIADB_COMPOSE_FILE_1 -f $MARIADB_TUNING_COMPOSE_FILE down
       ;;
     logs)
       docker compose --project-name $MARIADB_PROJECT_NAME \
         --env-file $MARIADB_TARGET_ENV_FILE \
-        -f $MARIADB_COMPOSE_FILE_1 logs -f
+        -f $MARIADB_COMPOSE_FILE_1 -f $MARIADB_TUNING_COMPOSE_FILE logs -f
       ;;
     restart)
       docker compose --project-name $MARIADB_PROJECT_NAME \
         --env-file $MARIADB_TARGET_ENV_FILE \
-        -f $MARIADB_COMPOSE_FILE_1 down
+        -f $MARIADB_COMPOSE_FILE_1 -f $MARIADB_TUNING_COMPOSE_FILE down
       docker compose --project-name $MARIADB_PROJECT_NAME \
         --env-file $MARIADB_TARGET_ENV_FILE \
-        -f $MARIADB_COMPOSE_FILE_1 up -d
+        -f $MARIADB_COMPOSE_FILE_1 -f $MARIADB_TUNING_COMPOSE_FILE up -d
       ;;
     *)
       echo "Invalid action: $ACTION"

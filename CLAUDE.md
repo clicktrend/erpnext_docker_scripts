@@ -77,6 +77,130 @@ Tag version is controlled by `ERPNEXT_CUSTOM_TAG` in `.env`. The generated compo
 3. Run `scripts/erpnext-custom-setup.sh` (builds and regenerates compose file)
 4. Restart + migrate (see Key Commands above)
 
+## Tuning / dimensioning
+
+The stack shipped on defaults everywhere, on a machine far bigger than it used. Measured
+2026-08-10: 8 vCPU, 15 GB RAM — **all containers together 1.6 GB**.
+
+| What | Was | Now | Where it is persisted |
+|---|---|---|---|
+| Gunicorn workers | 2 (image CMD) | **5** | `compose/compose.prod-extras.yaml` |
+| `innodb_buffer_pool_size` | 128 MiB (default) | **3 GiB** | `compose/compose.mariadb-tuning.yaml` |
+| `innodb_io_capacity` / `_max` | 200 / 2000 (HDD default) | **1000 / 4000** | same |
+| Redis **cache** | `maxmemory 0` + `noeviction`, RDB on | **1 GiB + allkeys-lru**, RDB off | `compose/compose.prod-extras.yaml` |
+| Swap | none | **4 GiB**, `vm.swappiness=10` | `/etc/fstab`, `/etc/sysctl.d/99-erpnext-swap.conf` |
+
+**Deliberately unchanged:** `innodb_flush_log_at_trx_commit=1` — the only setting that guarantees a
+committed transaction survives a crash, and this is accounting data. Redis **queue** keeps
+`noeviction`: evicting a job means losing work silently.
+
+**Gunicorn lives in `compose.prod-extras.yaml`, not the Dockerfile.** A compose change is
+`erpnext-custom-setup.sh --config-only` + restart (~2 min); the Dockerfile needs a full `--no-cache`
+rebuild, a new tag and ~8 GB of fresh layers (~30 min). That difference decides whether the value
+ever gets tuned again. The Dockerfile CMD remains the fallback when the image runs without this
+compose file.
+
+All of the above is live as of 2026-08-10. Verified after the restart: gunicorn runs 6 processes
+(1 master + 5 workers), redis-cache reports the ceiling and `allkeys-lru` with RDB off, redis-queue
+is untouched, the InnoDB pool is 3 GiB, the scheduler is active, and the storefront answers in
+0.66 s.
+
+> ⚠️ **The InnoDB settings survive a *recreate*, not a bare restart.** The running
+> `mariadb-database` container has its CMD frozen from when it was created (2026-04-05) and that CMD
+> carries none of the tuning flags — the 3 GiB pool is currently a live `SET GLOBAL`. So:
+>
+> - `scripts/mariadb-docker.sh up` / `restart` → container is recreated, picks up
+>   `compose.mariadb-tuning.yaml`, keeps 3 GiB. ✅
+> - `docker restart mariadb-database` → same container, old CMD, **silently back to 128 MiB**. ❌
+>
+> The gunicorn and redis settings do not have this problem: those containers were recreated during
+> the 2026-08-10 restart and already carry the new command.
+
+> 🔴 **MariaDB version pin — read before restarting that stack.** The upstream
+> `.frappe_docker/overrides/compose.mariadb-shared.yaml` has moved to `mariadb:11.8`, while this host
+> runs **10.6**. With `MARIADB_AUTO_UPGRADE: 1`, a plain `mariadb-docker.sh restart` would silently
+> major-upgrade the engine across two versions. `compose/compose.mariadb-tuning.yaml` pins 10.6, and
+> `mariadb-docker.sh` merges it as a second `-f`. A major upgrade may well be right — but as a
+> planned migration with a backup and a rollback path, not as a side effect of a restart.
+
+## Housekeeping (disk)
+
+The build runs `--no-cache`, so **every deploy adds a complete new layer set** —
+~4.6 GB custom + ~3.8 GB base + a fresh build cache — and nothing used to remove the old ones.
+That is how the host reached 59 images / 84 GB and 88 % disk on 2026-08-10, with 19 GB left; a full
+disk corrupts MariaDB. Manual cleanup freed 99 GB.
+
+`scripts/deploy.sh` therefore ends with step 9, `scripts/prune-images.sh`:
+
+```bash
+scripts/prune-images.sh --dry-run     # preview, changes nothing
+scripts/prune-images.sh               # prune
+KEEP_RELEASES=5 scripts/prune-images.sh
+```
+
+- Keeps every image backing a running container, `base:latest` (input for the next build), and the
+  `KEEP_RELEASES` (default 3) most recent tags per managed repository. The running image is
+  protected separately and does **not** consume that budget.
+- Touches only `$ERPNEXT_CUSTOM_IMAGE` and `base`. Unrelated images (traefik, mariadb, leftovers)
+  are deliberately out of scope — an automatic cleanup should only delete what its own pipeline made.
+- Never passes `--force`, so anything still referenced survives and merely reports a conflict.
+- Also prunes dangling images, the build cache (worthless with `--no-cache`) and **anonymous**
+  volumes. Without `--all`, named volumes (`erpnext_sites`, `mariadb_db-data`) are out of reach by
+  construction.
+- Always exits 0: housekeeping must never turn a successful deploy into a failed one.
+
+**It is the last step on purpose.** Every `exit 1` earlier in `deploy.sh` leaves the previous image
+intact, which is exactly what a rollback needs — only a deploy that reached the end may discard it.
+
 ## Backup
 
-Backups are handled entirely by ERPNext's built-in scheduler and backup feature (configured under **Settings → Backups** in the ERPNext UI). No external scripts or cron jobs are needed.
+Two independent layers — do not confuse them when diagnosing:
+
+1. **In-site backups** — ERPNext's own scheduler writes to
+   `sites/erp.adomio.com/private/backups` inside the backend container. Configured in the ERPNext UI
+   under **Settings → Backups**. Stays on the host disk.
+2. **Offsite to S3** — `scripts/erpnext-s3-backup.sh`, driven by `systemd/erpnext-backup.timer`
+   (02:30 UTC daily). Streams the dump out of the container and uploads via rclone with a
+   write-only IAM user; retention is an S3 lifecycle rule, not a client-side prune.
+
+Layer 1 can be perfectly healthy while layer 2 is dead — that is exactly what happened on
+2026-08-07 (unit `exit 203`, i.e. systemd could not even exec the script).
+
+## Alerting
+
+One dispatcher, three sources. Config lives in `.configs/alerts.env` (git-ignored, **not** copied by
+`deploy sync` — create it on the server; template: `alerts.env.example`).
+
+- **`scripts/notify.sh <info|warn|crit> <subject> [body]`** — the only place that knows where alerts
+  go. Telegram first-class, optional generic webhook, always mirrors to the journal
+  (`journalctl -t erpnext-notify`). Exits 0 unconditionally: a broken alert channel must never take
+  down the job it watches, nor mask its exit code.
+- **Backup failure** — `systemd/erpnext-backup.service` has `OnFailure=erpnext-backup-alert@%n.service`
+  → `scripts/erpnext-backup-alert.sh` → `notify.sh`.
+- **Backup dead-man switch** — `HEALTHCHECK_URL` in `alerts.env`. `erpnext-s3-backup.sh` pings
+  `/start`, then the bare URL on success and `/fail` on error.
+  **This is not redundant with `OnFailure=`:** that only fires when the unit *runs and fails*. It
+  cannot fire when the run never happens (timer disabled, host down, unit unable to exec the script).
+  The 2026-08-07 outage was exactly that case and reached nobody.
+- **Disk** — `scripts/disk-watch.sh` via `systemd/erpnext-disk-watch.timer` (every 15 min).
+  Alerts on threshold *crossing* only (state in `/var/lib/erpnext-alerts/`), so a standing condition
+  does not repeat every quarter hour; sends one recovery notice. Includes the top disk consumers and
+  the prune commands in the message so the alert is actionable.
+
+Test the chain end-to-end with:
+
+```bash
+scripts/notify.sh info "Testalarm" "ausgeloest von Hand"
+```
+
+Installing the timers after a `deploy sync`:
+
+```bash
+cp systemd/*.service systemd/*.timer /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now erpnext-disk-watch.timer
+systemctl list-timers --all | grep erpnext
+```
+
+Concept and roadmap (own monitoring stack, phases 1–3):
+`docs/plans/2026-08-07-erpnext-monitoring-eigenbau.md` in the parent repo.

@@ -11,10 +11,41 @@
 # frontend labels: attach the maintenance-errors middleware (defined in
 # compose/compose.maintenance.yaml on the traefik stack) to the ERPNext router,
 # so backend 502-504s show the maintenance page instead of a bare gateway error.
+#
+# backend command: raises gunicorn from 2 workers to 5. The 2-worker value is
+# baked into images/layered/Dockerfile as the image CMD, and this host has 8
+# vCPU with all containers together using 1.6 GB of 15 GB -- the software was
+# throttled far below the machine it runs on. Two worker processes mean one slow
+# report or PDF render occupies half of all HTTP capacity.
+#
+# Overriding here rather than in the Dockerfile is deliberate: a compose change
+# needs `erpnext-custom-setup.sh --config-only` plus a restart (~2 min), while
+# the Dockerfile needs a full --no-cache rebuild, a new tag and ~8 GB of fresh
+# layers (~30 min). That difference decides whether this value ever gets tuned
+# again. The Dockerfile CMD stays as the fallback for anyone starting the image
+# without this compose file.
+#
+# --preload keeps the cost down: the app is loaded once in the master and
+# forked, measured ~300 MB per worker, so 5 workers land near 1.5 GB.
+# Everything else is copied verbatim from the image CMD -- only --workers moves,
+# so any effect is attributable to that one number. --timeout stays at 120 s;
+# raising it is a separate decision with its own trade-off (long requests hold a
+# worker hostage for longer).
 services:
   backend:
     extra_hosts:
       - erp.adomio.com:host-gateway
+    command:
+      - /home/frappe/frappe-bench/env/bin/gunicorn
+      - --chdir=/home/frappe/frappe-bench/sites
+      - --bind=0.0.0.0:8000
+      - --threads=4
+      - --workers=5
+      - --worker-class=gthread
+      - --worker-tmp-dir=/dev/shm
+      - --timeout=120
+      - --preload
+      - frappe.app:application
   queue-short:
     extra_hosts:
       - erp.adomio.com:host-gateway
@@ -24,6 +55,30 @@ services:
   scheduler:
     extra_hosts:
       - erp.adomio.com:host-gateway
+  # redis-cache ran on the image default: no memory ceiling and `noeviction`.
+  # That combination is a slow-burning fault -- the cache grows unbounded, and
+  # once it cannot allocate, redis starts returning errors instead of evicting,
+  # which surfaces as a broken site rather than a slow one. A cache is the one
+  # place where discarding the oldest entries is exactly the right answer, so:
+  # a ceiling plus allkeys-lru.
+  #
+  # --save "" turns off RDB snapshots for the cache only. Its contents are
+  # disposable by definition, and BGSAVE forks the process: with a 1 GiB ceiling
+  # that fork can transiently cost close to another gigabyte through
+  # copy-on-write, on a host that just handed 3 GiB to InnoDB.
+  #
+  # redis-queue deliberately gets NONE of this. Those keys are queued background
+  # jobs; evicting one loses work silently, which is far worse than running out
+  # of memory loudly.
+  redis-cache:
+    command:
+      - redis-server
+      - --maxmemory
+      - 1gb
+      - --maxmemory-policy
+      - allkeys-lru
+      - --save
+      - ""
   frontend:
     labels:
       traefik.http.routers.erpnext-erp-adomio-com-https.middlewares: maintenance-errors@docker
