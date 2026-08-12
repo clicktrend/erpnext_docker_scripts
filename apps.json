@@ -1,11 +1,11 @@
 [
   {
     "url": "https://github.com/frappe/erpnext.git",
-    "branch": "version-16"
+    "branch": "v16.31.1"
   },
   {
     "url": "https://github.com/frappe/hrms.git",
-    "branch": "version-16"
+    "branch": "v16.16.0"
   },
   {
     "url": "git@gitlab.com:clicktrend/adomio_erpnext_app.git",
@@ -13,19 +13,19 @@
   },
   {
     "url": "https://github.com/alyf-de/erpnext_germany.git",
-    "branch": "version-16"
+    "branch": "v16.1.1"
   },
   {
     "url": "https://github.com/alyf-de/erpnext_datev.git",
-    "branch": "version-16"
+    "branch": "v16.0.2"
   },
   {
     "url": "https://github.com/alyf-de/eu_einvoice.git",
-    "branch": "version-16"
+    "branch": "v16.2.2"
   },
   {
     "url": "https://github.com/frappe/print_designer.git",
-    "branch": "main"
+    "branch": "v1.6.7"
   },
   {
     "url": "https://github.com/clicktrend/erpnext_finapi.git",
