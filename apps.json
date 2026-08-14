@@ -9,7 +9,7 @@
   },
   {
     "url": "git@gitlab.com:clicktrend/adomio_erpnext_app.git",
-    "branch": "develop"
+    "branch": "v0.0.9.0"
   },
   {
     "url": "https://github.com/alyf-de/erpnext_germany.git",
