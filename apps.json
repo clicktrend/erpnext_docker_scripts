@@ -8,6 +8,10 @@
     "branch": "v16.16.0"
   },
   {
+    "url": "https://github.com/frappe/telephony.git",
+    "branch": "develop"
+  },
+  {
     "url": "https://github.com/frappe/helpdesk.git",
     "branch": "v1.28.1"
   },
