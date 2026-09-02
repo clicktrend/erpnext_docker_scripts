@@ -8,8 +8,12 @@
     "branch": "v16.16.0"
   },
   {
+    "url": "https://github.com/frappe/helpdesk.git",
+    "branch": "v1.28.1"
+  },
+  {
     "url": "git@gitlab.com:clicktrend/adomio_erpnext_app.git",
-    "branch": "v0.0.14.0"
+    "branch": "v0.0.15.0"
   },
   {
     "url": "https://github.com/alyf-de/erpnext_germany.git",
