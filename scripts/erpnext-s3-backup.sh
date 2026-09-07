@@ -40,11 +40,15 @@ ROOT_DIR="$SCRIPT_DIR/.."
 cd "$ROOT_DIR" || { echo "cannot cd to $ROOT_DIR"; exit 1; }
 
 # --- defaults (override in .configs/backup.env) ---
-PROJECT_NAME="erpnext"
-SITE="erp.adomio.com"
+#
+# Deliberately NO default for the instance identity (PROJECT_NAME / SITE /
+# S3_BUCKET). This repo is checked out once per stack; a second checkout that
+# forgets its backup.env would otherwise inherit the FIRST instance's identity
+# and quietly back that site up into that bucket -- a backup job that looks
+# perfectly healthy while the instance it is supposed to protect has none.
+# Identity is stated per instance, never inherited. Missing values abort loudly.
 BENCH_DIR="/home/frappe/frappe-bench"
 RCLONE_REMOTE="s3backup"
-S3_BUCKET="backup-erp-adomio-com"
 S3_PREFIX="db"
 BACKUP_FILES="0"
 ENABLE_S3_PRUNE="0"
@@ -121,6 +125,13 @@ fail() { log "ERROR: $*"; hc_ping fail; exit 1; }
 
 command -v rclone >/dev/null 2>&1 || fail "rclone not installed on host"
 [ -f "$RCLONE_CONFIG" ] || fail "rclone config not found: $RCLONE_CONFIG"
+
+# Which instance is this? Must come from .configs/backup.env -- see the note at
+# the defaults above.
+for _required in PROJECT_NAME SITE S3_BUCKET; do
+  [ -n "${!_required:-}" ] \
+    || fail "$_required nicht gesetzt -- .configs/backup.env fehlt oder ist unvollstaendig. Die zu sichernde Instanz wird bewusst nicht geraten."
+done
 
 DC=(docker compose --project-name "$PROJECT_NAME")
 
