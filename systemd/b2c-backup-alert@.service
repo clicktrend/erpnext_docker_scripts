@@ -1,0 +1,7 @@
+[Unit]
+Description=Alert on failed B2C ERPNext backup (%i)
+
+[Service]
+Type=oneshot
+# %i = the failed unit name, passed through from OnFailure=...@%n.service
+ExecStart=/opt/b2c_docker_scripts/scripts/erpnext-backup-alert.sh %i

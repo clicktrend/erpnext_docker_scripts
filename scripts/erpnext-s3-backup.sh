@@ -18,10 +18,20 @@
 #     case where the user is later granted s3:DeleteObject.
 #
 # Config lives in .configs/backup.env (git-ignored, not synced). Optional:
+#   PROJECT_NAME      docker compose project (default: erpnext)
+#   SITE              Frappe site to back up (default: erp.adomio.com)
 #   RCLONE_REMOTE     rclone remote name (default: s3backup)
 #   S3_BUCKET         target bucket (default: backup-erp-adomio-com)
 #   ENABLE_S3_PRUNE   1 to delete S3 objects older than RETENTION_DAYS (default 0)
 #   RETENTION_DAYS    age threshold for prune (default: 30)
+#
+# Monitoring config (HEALTHCHECK_URL, Telegram) lives in .configs/alerts.env,
+# which is sourced as well -- see the dead-man switch section below.
+#
+# The defaults describe the B2B instance; a second stack (e.g. the B2C instance
+# under /opt/b2c_docker_scripts) runs this same script from its own checkout
+# with its own .configs/ and its own systemd units. Keep every instance-specific
+# value in backup.env, never in the defaults here.
 
 set -euo pipefail
 
@@ -41,6 +51,16 @@ ENABLE_S3_PRUNE="0"
 RETENTION_DAYS="30"
 
 # Optional env overrides + rclone credentials remote.
+#
+# BOTH config files are sourced, in the same order as notify.sh: alerts.env is
+# the canonical home for monitoring/alert settings (HEALTHCHECK_URL, Telegram),
+# backup.env holds this job's own settings and wins on any overlap.
+#
+# alerts.env used to be missing here. The file documented itself as "consumed by
+# erpnext-s3-backup.sh", the unit had no EnvironmentFile=, and so HEALTHCHECK_URL
+# was never actually in scope: the dead-man switch below silently watched
+# nothing from the day it was built (2026-08-10) until 2026-09-07.
+[ -f "$ROOT_DIR/.configs/alerts.env" ] && source "$ROOT_DIR/.configs/alerts.env"
 [ -f "$ROOT_DIR/.configs/backup.env" ] && source "$ROOT_DIR/.configs/backup.env"
 export RCLONE_CONFIG="${RCLONE_CONFIG:-$ROOT_DIR/.configs/rclone.conf}"
 
@@ -55,17 +75,38 @@ log() { echo "$(date -u +'%Y-%m-%dT%H:%M:%SZ') [erpnext-s3-backup] $*"; }
 # exec this script. That is not hypothetical; on 2026-08-07 the unit died with
 # exit 203 (could not execute), so nothing inside this file ever ran.
 #
-# Ping failures are swallowed: monitoring must never break the backup.
+# Ping failures are swallowed: monitoring must never break the backup, so this
+# function always returns 0 and never trips `set -e`.
 # A ping that silently goes nowhere is the worst outcome here: a typo in the
-# URL, a deleted check or a rotated ping key would leave the switch looking
-# healthy while watching nothing. So the HTTP status is checked and anything
-# other than 200 is made loud in the journal -- without ever failing the
-# backup itself, which is the whole point of the surrounding `|| return 0`.
+# URL, a deleted check, a rotated ping key -- or no URL in scope at all -- would
+# leave the switch looking healthy while watching nothing. So both the empty
+# case and any HTTP status other than 200 are made loud, without ever failing
+# the backup itself.
 # (No `-f`: we want curl to hand us the real status code instead of erroring
 # out on 4xx, so 404 can be reported as 404 rather than a generic failure.)
 hc_ping() {
-  [ -n "${HEALTHCHECK_URL:-}" ] || return 0
   local suffix="${1:-}" code
+
+  # An UNSET url is not a quiet "monitoring is optional" -- it is the switch
+  # watching nothing, which is the exact state this function exists to prevent.
+  # It used to `return 0` here without a word, which is how the misconfiguration
+  # survived four weeks of green backup runs. Now it is as loud as a failed
+  # ping: journal + err priority + the normal alert channel.
+  #
+  # Once per run (on the 'start' ping) so a misconfigured host nags daily
+  # instead of three times a day, and stops the moment the URL is set.
+  if [ -z "${HEALTHCHECK_URL:-}" ]; then
+    if [ "$suffix" = "start" ]; then
+      log "WARN: HEALTHCHECK_URL nicht gesetzt -- Totmann-Schalter ueberwacht nichts"
+      logger -p daemon.err -t erpnext-s3-backup \
+        "HEALTHCHECK_URL not set -- dead-man switch is watching nothing; set it in .configs/alerts.env"
+      "$SCRIPT_DIR/notify.sh" warn "Backup-Totmannschalter nicht konfiguriert" \
+        "HEALTHCHECK_URL fehlt in .configs/alerts.env auf $(hostname). Das Backup selbst laeuft, aber ein AUSGEFALLENER Lauf faellt niemandem auf." \
+        || true
+    fi
+    return 0
+  fi
+
   code=$(curl -sS -m 10 -o /dev/null -w '%{http_code}' --retry 2 \
            "${HEALTHCHECK_URL}${suffix:+/$suffix}" 2>/dev/null) || code="000"
   if [ "$code" != "200" ]; then

@@ -1,0 +1,15 @@
+[Unit]
+Description=Daily B2C ERPNext database backup to S3
+
+[Timer]
+# 03:30 UTC daily -- deliberately one hour after erpnext-backup.timer.
+# Both stacks share one host, one docker daemon and one disk, and the host runs
+# close to its RAM limit (see the 2026-09-01 swap incident). Two `bench backup`
+# runs plus two multi-hundred-MB tar streams at the same minute is avoidable
+# contention for no gain.
+OnCalendar=*-*-* 03:30:00 UTC
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target
