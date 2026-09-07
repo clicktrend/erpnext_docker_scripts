@@ -1,0 +1,22 @@
+[Unit]
+# Second instance of the same job: the B2C stack (erp.mit-gravur.de) runs its
+# own checkout of this repo under /opt/b2c_docker_scripts, with its own
+# .configs/ (own bucket, own rclone credentials, own HEALTHCHECK_URL).
+#
+# The units are separate files rather than a template because the two instances
+# must be able to fail, be disabled and be alerted on independently. Keep them
+# in sync with erpnext-backup.{service,timer} by hand -- they differ only in
+# Description, ExecStart path and the OnFailure target.
+Description=B2C ERPNext database backup to S3 (erp.mit-gravur.de)
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+OnFailure=b2c-backup-alert@%n.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/b2c_docker_scripts/scripts/erpnext-s3-backup.sh
+Nice=10
+IOSchedulingClass=idle
+# Backups are non-critical background work; don't hold up boot or spam alerts.
+TimeoutStartSec=1800
