@@ -51,6 +51,10 @@ RUN if [ -f /home/frappe/frappe-bench/apps/erpnext_capture/frontend/package.json
         echo "No erpnext_capture/frontend/package.json found, skipping."; \
     fi
 
+# Python 3.13 dropped the stdlib `cgi` module; the Shopify client stack (ShopifyAPI/pyactiveresource) still
+# imports it on some code paths (install of the ecommerce_integrations fork failed on prod, 2026-09-08).
+RUN /home/frappe/frappe-bench/env/bin/pip install --no-cache-dir legacy-cgi
+
 # Arbeitsverzeichnis setzen (falls nötig)
 WORKDIR /home/frappe/frappe-bench
 
