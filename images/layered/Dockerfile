@@ -39,6 +39,18 @@ RUN if [ -f /home/frappe/frappe-bench/apps/adomio/frontend/package.json ]; then 
         echo "No frontend/package.json found, skipping React build."; \
     fi
 
+# Build the erpnext_capture receipt-review SPA (B2C image, app is optional: guarded like adomio above).
+# vite.config: outDir ../erpnext_capture/public/frontend, base /assets/erpnext_capture/frontend/ (2026-09-08).
+RUN if [ -f /home/frappe/frappe-bench/apps/erpnext_capture/frontend/package.json ]; then \
+        echo "Building erpnext_capture frontend..." && \
+        cd /home/frappe/frappe-bench/apps/erpnext_capture/frontend && \
+        npm install --no-audit --no-fund && \
+        node_modules/.bin/vite build && \
+        echo "erpnext_capture frontend build complete."; \
+    else \
+        echo "No erpnext_capture/frontend/package.json found, skipping."; \
+    fi
+
 # Arbeitsverzeichnis setzen (falls nötig)
 WORKDIR /home/frappe/frappe-bench
 
