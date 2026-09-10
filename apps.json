@@ -42,5 +42,9 @@
   {
     "url": "https://github.com/clicktrend/frappe_timeclock.git",
     "branch": "main"
+  },
+  {
+    "url": "https://github.com/alyf-de/ask_alyf.git",
+    "branch": "version-16"
   }
 ]
