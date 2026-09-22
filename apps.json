@@ -1,7 +1,7 @@
 [
   {
     "url": "https://github.com/frappe/erpnext.git",
-    "branch": "v16.31.1"
+    "branch": "v16.35.0"
   },
   {
     "url": "https://github.com/frappe/hrms.git",
@@ -37,14 +37,14 @@
   },
   {
     "url": "https://github.com/clicktrend/erpnext_finapi.git",
-    "branch": "develop"
+    "branch": "v0.0.3"
   },
   {
     "url": "https://github.com/clicktrend/frappe_timeclock.git",
-    "branch": "main"
+    "branch": "v0.1.2"
   },
   {
     "url": "https://github.com/alyf-de/ask_alyf.git",
-    "branch": "version-16"
+    "branch": "v16.3.0"
   }
 ]
