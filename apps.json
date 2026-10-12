@@ -8,8 +8,8 @@
     "branch": "v16.16.0"
   },
   {
-    "url": "https://github.com/frappe/telephony.git",
-    "branch": "develop"
+    "url": "https://github.com/clicktrend/telephony.git",
+    "branch": "adomio-2026-10-09"
   },
   {
     "url": "https://github.com/frappe/helpdesk.git",
@@ -17,7 +17,7 @@
   },
   {
     "url": "git@gitlab.com:clicktrend/adomio_erpnext_app.git",
-    "branch": "v0.0.18.2"
+    "branch": "v0.0.19.3"
   },
   {
     "url": "https://github.com/alyf-de/erpnext_germany.git",
@@ -45,6 +45,6 @@
   },
   {
     "url": "https://github.com/alyf-de/ask_alyf.git",
-    "branch": "v16.3.0"
+    "branch": "v16.5.0"
   }
 ]

@@ -31,13 +31,24 @@ fi
 step "1/9  Update scripts + frappe_docker"
 scripts/update.sh
 
-# ── Step 2: apps.json review ───────────────────────────────────────────────────
-step "2/9  Review apps.json"
+# ── Step 2: apps.json = tags only ──────────────────────────────────────────────
+# Versions are written in one place, deploy/erpnext-stack.lock.json in the parent repo
+# (adomio-desktop), and rendered into this repo's apps.json; step 1 pulled it. Editing it here
+# made the server the only place that knew what ran (v0.0.16.1 to v0.0.19.3), so it is not offered
+# any more. A branch clones whatever its head is that day, so only tags may stand in apps.json.
+step "2/9  apps.json (tags only, from the version lock)"
 echo ""
-cat "$ERPNEXT_CUSTOM_APPS_JSON_FILE"
-echo ""
-if confirm "Edit apps.json before building?"; then
-  ${EDITOR:-nano} "$ERPNEXT_CUSTOM_APPS_JSON_FILE"
+bad=0
+while read -r url ref; do
+  if git ls-remote --tags "$url" "refs/tags/$ref" | grep -q .; then
+    printf '  %-45s %s\n' "${url##*/}" "$ref"
+  else
+    printf '  %-45s %s  <- KEIN TAG\n' "${url##*/}" "$ref"; bad=1
+  fi
+done < <(python3 -c 'import json,sys; [print(a["url"], a["branch"]) for a in json.load(open(sys.argv[1]))]' "$ERPNEXT_CUSTOM_APPS_JSON_FILE")
+if [ "$bad" -ne 0 ]; then
+  echo "Aborted: apps.json pins a branch. Change deploy/erpnext-stack.lock.json, render, commit, pull." >&2
+  exit 1
 fi
 
 # ── Step 3: Bump version tag ───────────────────────────────────────────────────
