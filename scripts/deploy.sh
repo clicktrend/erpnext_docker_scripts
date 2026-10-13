@@ -80,16 +80,24 @@ if [ "$(git rev-parse HEAD)" != "$(git rev-parse '@{u}' 2>/dev/null)" ]; then
   exit 1
 fi
 echo ""
+# Private repos (git@…, e.g. adomio on GitLab) are only readable with the build's deploy key —
+# the same key erpnext-custom-setup.sh hands to the build as a secret. Without it ls-remote fails
+# with "Permission denied", which this check used to report as a missing tag (first lock deploy,
+# 2026-10-13). So: read with the deploy key, and tell "no access" apart from "no such tag".
+LS_REMOTE_SSH="ssh -i $DEPLOY_KEY_FILE -o IdentitiesOnly=yes -o BatchMode=yes"
 bad=0
 while read -r url ref; do
-  if git ls-remote --tags "$url" "refs/tags/$ref" | grep -q .; then
+  if ! out=$(GIT_SSH_COMMAND="$LS_REMOTE_SSH" git ls-remote --tags "$url" "refs/tags/$ref" 2>&1); then
+    printf '  %-45s %s  <- KEIN ZUGRIFF (%s)\n' "${url##*/}" "$ref" "$(printf '%s' "$out" | grep -m1 -i -E 'denied|fatal|error' | cut -c1-60)"; bad=1
+  elif printf '%s' "$out" | grep -q "refs/tags/$ref"; then
     printf '  %-45s %s\n' "${url##*/}" "$ref"
   else
     printf '  %-45s %s  <- KEIN TAG\n' "${url##*/}" "$ref"; bad=1
   fi
 done < <(python3 -c 'import json,sys; [print(a["url"], a["branch"]) for a in json.load(open(sys.argv[1]))]' "$ERPNEXT_CUSTOM_APPS_JSON_FILE")
 if [ "$bad" -ne 0 ]; then
-  echo "Aborted: apps.json pins a branch. Change deploy/erpnext-stack.lock.json, render, commit, pull." >&2
+  echo "Aborted: apps.json has a ref that is not a readable tag (see above). A missing tag: change" >&2
+  echo "  deploy/erpnext-stack.lock.json, render, commit, pull. No access: check $DEPLOY_KEY_FILE on that repo." >&2
   exit 1
 fi
 
