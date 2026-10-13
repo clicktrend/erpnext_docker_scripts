@@ -34,6 +34,25 @@ touches the same file, the next pull refuses to overwrite it and step 1 fails �
 which is the point. So: **commit and push to `main`, then sync.** `.configs/`, `.env` and
 `.frappe_docker/` are gitignored and excluded from the sync; they are server-only and unaffected.
 
+**Since 2026-10-13 the deploy actually stops there.** Until then it only printed the pull error and
+carried on (neither `update.sh` nor `deploy.sh` checked the exit code) — and from v0.0.16.1 to
+v0.0.19.3 a hand-edited `apps.json` sat in this checkout, unseen by git. Now `update.sh` exits
+non-zero when the pull of this checkout fails, and `deploy.sh` aborts on it in step 1. Step 2 also
+aborts when `apps.json` differs from `HEAD` or `HEAD` is not at its upstream: a local edit survives a
+pull that does not touch the file, and a local commit is unknown to git elsewhere — both would build
+a version the version lock (`deploy/erpnext-stack.lock.json` in the parent repo) never saw. The
+`.frappe_docker` pull stays non-fatal: the fork checkout carries a server-local override.
+
+**Deploying without anyone at the terminal.** An ssh session does not survive the ~20 min build, so
+answer both prompts up front and run detached; follow the log for `Deployment complete` or `Abort`:
+
+```bash
+setsid nohup scripts/deploy.sh --tag 0.0.19.5 --yes > /tmp/deploy-0.0.19.5.log 2>&1 &
+```
+
+`--yes` requires `--tag` with a tag other than the running one, so the previous image stays on the
+host for a rollback. Without options the script asks as before.
+
 ## Key Commands
 
 All scripts must be run from the project root (they use `common.sh` which `cd`s to the root and sources `.env`).
