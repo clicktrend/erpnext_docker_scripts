@@ -15,6 +15,34 @@ step() {
   echo "──────────────────────────────────────────"
 }
 
+# ── Options ────────────────────────────────────────────────────────────────────
+# Without options the script asks for the image tag and confirms the build, as before.
+# An ssh session does not survive the ~20 min build, so a run without anyone at the
+# terminal goes detached and answers both questions up front:
+#   setsid nohup scripts/deploy.sh --tag 0.0.19.5 --yes > /tmp/deploy-0.0.19.5.log 2>&1 &
+#   --tag <tag>  new ERPNEXT_CUSTOM_TAG, no prompt
+#   --yes        no "Start build?" confirmation. Needs --tag with a NEW tag: the previous
+#                image must stay on the host under its own tag for a rollback.
+NEW_TAG=""
+TAG_GIVEN=0
+ASSUME_YES=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --tag)    NEW_TAG="${2:-}"; TAG_GIVEN=1; shift; [ $# -gt 0 ] && shift ;;
+    --tag=*)  NEW_TAG="${1#--tag=}"; TAG_GIVEN=1; shift ;;
+    --yes|-y) ASSUME_YES=1; shift ;;
+    *) echo "Unknown option: $1 (allowed: --tag <tag>, --yes)" >&2; exit 2 ;;
+  esac
+done
+if [ "$TAG_GIVEN" -eq 1 ] && ! [[ "$NEW_TAG" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+  echo "Invalid --tag '$NEW_TAG' (letters, digits, '.', '_', '-')." >&2
+  exit 2
+fi
+if [ "$ASSUME_YES" -eq 1 ] && [ "$TAG_GIVEN" -eq 0 ]; then
+  echo "--yes needs --tag <new tag>: a build without anyone watching must not reuse the running image's tag." >&2
+  exit 2
+fi
+
 # ── Preflight: Deploy key ──────────────────────────────────────────────────────
 DEPLOY_KEY_FILE="${CONFIGS_DIR}/deploy_key"
 if [ ! -f "$DEPLOY_KEY_FILE" ]; then
@@ -29,7 +57,9 @@ fi
 
 # ── Step 1: Update ─────────────────────────────────────────────────────────────
 step "1/9  Update scripts + frappe_docker"
-scripts/update.sh
+# A failed pull used to print an error and carry on with whatever apps.json was on disk
+# (the 2026-08-10 drift). The lock's apps.json only arrives through this pull, so it must succeed.
+scripts/update.sh || { echo "Update failed (git pull). Aborting before anything is built." >&2; exit 1; }
 
 # ── Step 2: apps.json = tags only ──────────────────────────────────────────────
 # Versions are written in one place, deploy/erpnext-stack.lock.json in the parent repo
@@ -37,6 +67,18 @@ scripts/update.sh
 # made the server the only place that knew what ran (v0.0.16.1 to v0.0.19.3), so it is not offered
 # any more. A branch clones whatever its head is that day, so only tags may stand in apps.json.
 step "2/9  apps.json (tags only, from the version lock)"
+# Only the committed, pushed apps.json is the lock's. A local edit survives a pull that does not
+# touch the file, and a local commit is something git elsewhere does not know: both would build a
+# version the gate never saw.
+if ! git diff --quiet HEAD -- apps.json; then
+  echo "Aborted: apps.json has local changes; it must come from the version lock through git." >&2
+  echo "  Compare with 'git diff apps.json', then let a human discard the change and pull (release runbook)." >&2
+  exit 1
+fi
+if [ "$(git rev-parse HEAD)" != "$(git rev-parse '@{u}' 2>/dev/null)" ]; then
+  echo "Aborted: this checkout is not at its upstream ($(git rev-parse --abbrev-ref '@{u}' 2>/dev/null || echo 'none')); deploy only from the pushed state." >&2
+  exit 1
+fi
 echo ""
 bad=0
 while read -r url ref; do
@@ -54,7 +96,12 @@ fi
 # ── Step 3: Bump version tag ───────────────────────────────────────────────────
 step "3/9  Version tag"
 echo "Current ERPNEXT_CUSTOM_TAG: $ERPNEXT_CUSTOM_TAG"
-read -rp "New tag (leave empty to keep '$ERPNEXT_CUSTOM_TAG'): " NEW_TAG
+if [ "$TAG_GIVEN" -eq 0 ]; then
+  read -rp "New tag (leave empty to keep '$ERPNEXT_CUSTOM_TAG'): " NEW_TAG
+elif [ "$ASSUME_YES" -eq 1 ] && [ "$NEW_TAG" = "$ERPNEXT_CUSTOM_TAG" ]; then
+  echo "Aborted: --tag $NEW_TAG is the running image's tag; a build without confirmation needs a new one." >&2
+  exit 1
+fi
 if [ -n "$NEW_TAG" ]; then
   sed -i "s/^ERPNEXT_CUSTOM_TAG=.*/ERPNEXT_CUSTOM_TAG=$NEW_TAG/" .env
   export ERPNEXT_CUSTOM_TAG=$NEW_TAG
@@ -68,7 +115,11 @@ echo "  FRAPPE_BRANCH = $FRAPPE_BRANCH"
 echo "  CUSTOM_IMAGE  = $ERPNEXT_CUSTOM_IMAGE:$ERPNEXT_CUSTOM_TAG"
 echo "  APPS          = $(cat $ERPNEXT_CUSTOM_APPS_JSON_FILE | grep url | awk -F'"' '{print $4}' | paste -sd ', ')"
 echo ""
-confirm "Start build?" || { echo "Aborted."; exit 0; }
+if [ "$ASSUME_YES" -eq 1 ]; then
+  echo "Start build? yes (--yes)"
+else
+  confirm "Start build?" || { echo "Aborted."; exit 0; }
+fi
 
 # ── Step 4: Build ──────────────────────────────────────────────────────────────
 step "4/9  Build custom image + generate compose"
