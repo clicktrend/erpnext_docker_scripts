@@ -106,7 +106,8 @@ docker compose --project-name erpnext --env-file .env --env-file $ERPNEXT_TARGET
   -f $FRAPPE_DOCKER_DIR/overrides/compose.redis.yaml \
   -f $FRAPPE_DOCKER_DIR/overrides/compose.multi-bench.yaml \
   -f $FRAPPE_DOCKER_DIR/overrides/compose.multi-bench-ssl.yaml \
-  -f compose/compose.prod-extras.yaml config > $ERPNEXT_CUSTOM_TARGET_YAML_FILE
+  -f compose/compose.prod-extras.yaml \
+  -f compose/compose.mariadb-client.yaml config > $ERPNEXT_CUSTOM_TARGET_YAML_FILE
 
 # Step 5: Unset environment variables
 unset CUSTOM_IMAGE

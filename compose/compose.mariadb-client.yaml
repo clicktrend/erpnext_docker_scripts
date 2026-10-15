@@ -1,0 +1,28 @@
+# MariaDB command-line client without TLS, merged into the generated ERPNext compose file
+# (extra -f in the `docker compose config` step of erpnext-custom-setup.sh).
+#
+# From frappe 16.50 on, the image ships the MariaDB 11.8 client, which requires TLS by default.
+# The database (mariadb:10.6 on the internal docker network) offers none, so `bench backup`
+# (mariadb-dump) and `bench mariadb` fail with "SSL is required, but the server does not
+# support it" - while the app itself (PyMySQL) keeps running, so the break only shows at the
+# next backup (B2C release 0.13.2, 14.10.2026). The connection never used TLS before; this
+# restores the old client behaviour for the services that run bench commands.
+#
+# A file inside the container would be lost on every `restart` (down + up); a compose config
+# survives restarts and rebuilds.
+configs:
+  mariadb-client-no-tls:
+    content: |
+      [client]
+      skip-ssl
+
+x-mariadb-client: &mariadb-client
+  configs:
+    - source: mariadb-client-no-tls
+      target: /etc/mysql/conf.d/zz-client-no-tls.cnf
+
+services:
+  backend: *mariadb-client
+  queue-short: *mariadb-client
+  queue-long: *mariadb-client
+  scheduler: *mariadb-client
