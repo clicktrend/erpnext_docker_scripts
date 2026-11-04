@@ -51,6 +51,15 @@ RUN if [ -f /home/frappe/frappe-bench/apps/erpnext_capture/frontend/package.json
         echo "No erpnext_capture/frontend/package.json found, skipping."; \
     fi
 
+# Raven (B2B, 2026-11-04): its `openai-agents` (unpinned, >=0.17.2) pulls openai 3.x, while ask_alyf's
+# langchain-openai and litellm require openai<3. Pin the last openai-agents that accepts openai 2.x and keep
+# openai on 2.x. Placed after CACHEBUST so a changed pin applies without a --no-cache base build.
+RUN if [ -d /home/frappe/frappe-bench/apps/raven ]; then \
+        /home/frappe/frappe-bench/env/bin/pip install --no-cache-dir --no-deps \
+            "openai==2.54.0" "openai-agents==0.20.0" && \
+        /home/frappe/frappe-bench/env/bin/pip check 2>&1 | grep -iE "openai|agents|langchain|litellm|raven" || true; \
+    fi
+
 # Python 3.13 dropped the stdlib `cgi` module; the Shopify client stack (ShopifyAPI/pyactiveresource) still
 # imports it on some code paths (install of the ecommerce_integrations fork failed on prod, 2026-09-08).
 RUN /home/frappe/frappe-bench/env/bin/pip install --no-cache-dir legacy-cgi

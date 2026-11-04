@@ -46,5 +46,9 @@
   {
     "url": "https://github.com/alyf-de/ask_alyf.git",
     "branch": "v16.5.0"
+  },
+  {
+    "url": "https://github.com/The-Commit-Company/raven.git",
+    "branch": "v3.2.0"
   }
 ]
