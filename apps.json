@@ -17,7 +17,7 @@
   },
   {
     "url": "git@gitlab.com:clicktrend/adomio_erpnext_app.git",
-    "branch": "v0.0.20.0"
+    "branch": "v0.0.21.0"
   },
   {
     "url": "https://github.com/alyf-de/erpnext_germany.git",
@@ -50,5 +50,9 @@
   {
     "url": "https://github.com/The-Commit-Company/raven.git",
     "branch": "v3.2.0"
+  },
+  {
+    "url": "https://github.com/frappe/wiki.git",
+    "branch": "v3.4.0"
   }
 ]

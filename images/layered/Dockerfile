@@ -60,6 +60,13 @@ RUN if [ -d /home/frappe/frappe-bench/apps/raven ]; then \
         /home/frappe/frappe-bench/env/bin/pip check 2>&1 | grep -iE "openai|agents|langchain|litellm|raven" || true; \
     fi
 
+# Wiki (B2B, 2026-11-05): its `duckdb>=1.4.3,<2` lets pip lift duckdb to 1.5.x, while frappe pins
+# `duckdb~=1.4.3`. Put duckdb back on frappe's line, only when apps/wiki is in the image.
+RUN if [ -d /home/frappe/frappe-bench/apps/wiki ]; then \
+        /home/frappe/frappe-bench/env/bin/pip install --no-cache-dir --no-deps "duckdb==1.4.5" && \
+        /home/frappe/frappe-bench/env/bin/pip check 2>&1 | grep -iE "duckdb|wiki" || true; \
+    fi
+
 # Python 3.13 dropped the stdlib `cgi` module; the Shopify client stack (ShopifyAPI/pyactiveresource) still
 # imports it on some code paths (install of the ecommerce_integrations fork failed on prod, 2026-09-08).
 RUN /home/frappe/frappe-bench/env/bin/pip install --no-cache-dir legacy-cgi
