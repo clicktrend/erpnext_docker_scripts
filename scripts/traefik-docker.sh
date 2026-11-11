@@ -12,6 +12,13 @@ fi
 # Maintenance page container (fallback router + errors middleware), lives in this repo
 TRAEFIK_COMPOSE_FILE_3="${TRAEFIK_COMPOSE_FILE_3:-compose/compose.maintenance.yaml}"
 
+# Optional fourth file (e.g. compose/compose.traefik-origin-cert.yaml), set in .env.
+# Empty keeps the three-file call unchanged.
+TRAEFIK_EXTRA_FILES=()
+if [ -n "${TRAEFIK_COMPOSE_FILE_4:-}" ]; then
+  TRAEFIK_EXTRA_FILES=(-f "$TRAEFIK_COMPOSE_FILE_4")
+fi
+
 # Function to run the Docker Compose command
 run_docker_compose() {
   local ACTION=$1
@@ -21,33 +28,33 @@ run_docker_compose() {
         --env-file $TRAEFIK_TARGET_ENV_FILE \
         -f $TRAEFIK_COMPOSE_FILE_1 \
         -f $TRAEFIK_COMPOSE_FILE_2 \
-        -f $TRAEFIK_COMPOSE_FILE_3 up -d
+        -f $TRAEFIK_COMPOSE_FILE_3 "${TRAEFIK_EXTRA_FILES[@]}" up -d
       ;;
     down)
       docker compose --project-name $TRAEFIK_PROJECT_NAME \
         --env-file $TRAEFIK_TARGET_ENV_FILE \
         -f $TRAEFIK_COMPOSE_FILE_1 \
         -f $TRAEFIK_COMPOSE_FILE_2 \
-        -f $TRAEFIK_COMPOSE_FILE_3 down
+        -f $TRAEFIK_COMPOSE_FILE_3 "${TRAEFIK_EXTRA_FILES[@]}" down
       ;;
     logs)
       docker compose --project-name $TRAEFIK_PROJECT_NAME \
         --env-file $TRAEFIK_TARGET_ENV_FILE \
         -f $TRAEFIK_COMPOSE_FILE_1 \
         -f $TRAEFIK_COMPOSE_FILE_2 \
-        -f $TRAEFIK_COMPOSE_FILE_3 logs -f
+        -f $TRAEFIK_COMPOSE_FILE_3 "${TRAEFIK_EXTRA_FILES[@]}" logs -f
       ;;
     restart)
       docker compose --project-name $TRAEFIK_PROJECT_NAME \
         --env-file $TRAEFIK_TARGET_ENV_FILE \
         -f $TRAEFIK_COMPOSE_FILE_1 \
         -f $TRAEFIK_COMPOSE_FILE_2 \
-        -f $TRAEFIK_COMPOSE_FILE_3 down
+        -f $TRAEFIK_COMPOSE_FILE_3 "${TRAEFIK_EXTRA_FILES[@]}" down
       docker compose --project-name $TRAEFIK_PROJECT_NAME \
         --env-file $TRAEFIK_TARGET_ENV_FILE \
         -f $TRAEFIK_COMPOSE_FILE_1 \
         -f $TRAEFIK_COMPOSE_FILE_2 \
-        -f $TRAEFIK_COMPOSE_FILE_3 up -d
+        -f $TRAEFIK_COMPOSE_FILE_3 "${TRAEFIK_EXTRA_FILES[@]}" up -d
       ;;
     *)
       echo "Invalid action: $ACTION"

@@ -45,6 +45,8 @@ scripts/traefik-docker.sh up   # start Traefik
 
 Point your DNS to the domain you entered. The Traefik dashboard is available at that domain — log in with `admin` and the password you set.
 
+**Behind Cloudflare (proxied):** Let's Encrypt via TLS challenge cannot work, because Cloudflare terminates TLS. Use Cloudflare Origin CA certificates instead: put `<zone>.pem` and `<zone>.key` into `.configs/origin-certs/` (key `0600`), list them in `compose/traefik-dynamic/origin-certs.yaml` and set `TRAEFIK_COMPOSE_FILE_4=compose/compose.traefik-origin-cert.yaml` in `.env`. Then set Cloudflare to "Full (strict)" per hostname, never zone-wide unless every proxied name has a valid origin certificate.
+
 ### 2. MariaDB
 
 ```bash

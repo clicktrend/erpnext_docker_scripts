@@ -1,0 +1,11 @@
+# Cloudflare Origin CA certificates for the zones served by this host.
+# Loaded by Traefik's file provider (compose/compose.traefik-origin-cert.yaml).
+# The PEM files live outside git in .configs/origin-certs/ (key 0600, root),
+# the copy of record is Vaultwarden "Infra". Only Cloudflare trusts this CA, so
+# Cloudflare must stay in front (proxied) for browsers. Valid until 2041.
+tls:
+  certificates:
+    - certFile: /certs/adomio.com.pem
+      keyFile: /certs/adomio.com.key
+    - certFile: /certs/mit-gravur.de.pem
+      keyFile: /certs/mit-gravur.de.key

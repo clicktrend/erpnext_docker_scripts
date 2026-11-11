@@ -1,0 +1,32 @@
+# Cloudflare Origin CA certificates for Traefik — fourth -f in traefik-docker.sh
+# (TRAEFIK_COMPOSE_FILE_4), so Cloudflare can run "Full (strict)" per hostname.
+#
+# Why the whole command list is repeated: compose replaces `command` on merge, it
+# does not append. This is the list from .frappe_docker/overrides/
+# compose.traefik-ssl.yaml plus the file provider at the end. Keep both in sync
+# when frappe_docker changes its list.
+#
+# The `le` resolver stays: the routers still reference tls.certresolver=le, and a
+# router pointing at an unknown resolver may be dropped. With a matching
+# certificate in the store Traefik skips ACME for these names ("No ACME
+# certificate generation required", tested locally with traefik:v3.6, 11.11.2026).
+#
+# ${PWD} works because traefik-docker.sh always cds to the repo root first.
+services:
+  traefik:
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.http.address=:80
+      - --entrypoints.https.address=:443
+      - --certificatesresolvers.le.acme.email=${EMAIL:?No EMAIL set}
+      - --certificatesresolvers.le.acme.storage=/certificates/acme.json
+      - --certificatesresolvers.le.acme.tlschallenge=true
+      - --accesslog
+      - --log
+      - --api
+      - --providers.file.directory=/etc/traefik/dynamic
+      - --providers.file.watch=true
+    volumes:
+      - ${PWD}/compose/traefik-dynamic:/etc/traefik/dynamic:ro
+      - ${PWD}/.configs/origin-certs:/certs:ro
