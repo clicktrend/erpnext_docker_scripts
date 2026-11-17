@@ -23,17 +23,39 @@ step() {
 #   --tag <tag>  new ERPNEXT_CUSTOM_TAG, no prompt
 #   --yes        no "Start build?" confirmation. Needs --tag with a NEW tag: the previous
 #                image must stay on the host under its own tag for a rollback.
+#
+# Prebuild, so a person only has to be there for the part that touches production:
+#   setsid nohup scripts/deploy.sh --tag 0.0.34.0 --yes --build-only > /tmp/build-0.0.34.0.log 2>&1 &
+#       steps 1-4, then .env and the generated compose file go back to the running tag
+#       (checked byte for byte), and a marker records which apps.json/FRAPPE_BRANCH the
+#       image was built from. Production keeps running the old image; a restart in between
+#       (dockerd, host) brings back the old image, never a half deploy.
+#   setsid nohup scripts/deploy.sh --tag 0.0.34.0 --yes --skip-build > /tmp/deploy-0.0.34.0.log 2>&1 &
+#       steps 1-3, no build: the image must exist and its marker must match the current
+#       apps.json + FRAPPE_BRANCH, otherwise abort before anything changes. Then 5-9 as usual.
 NEW_TAG=""
 TAG_GIVEN=0
 ASSUME_YES=0
+BUILD_ONLY=0
+SKIP_BUILD=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --tag)    NEW_TAG="${2:-}"; TAG_GIVEN=1; shift; [ $# -gt 0 ] && shift ;;
     --tag=*)  NEW_TAG="${1#--tag=}"; TAG_GIVEN=1; shift ;;
     --yes|-y) ASSUME_YES=1; shift ;;
-    *) echo "Unknown option: $1 (allowed: --tag <tag>, --yes)" >&2; exit 2 ;;
+    --build-only) BUILD_ONLY=1; shift ;;
+    --skip-build) SKIP_BUILD=1; shift ;;
+    *) echo "Unknown option: $1 (allowed: --tag <tag>, --yes, --build-only, --skip-build)" >&2; exit 2 ;;
   esac
 done
+if [ "$BUILD_ONLY" -eq 1 ] && [ "$SKIP_BUILD" -eq 1 ]; then
+  echo "--build-only and --skip-build exclude each other." >&2
+  exit 2
+fi
+if { [ "$BUILD_ONLY" -eq 1 ] || [ "$SKIP_BUILD" -eq 1 ]; } && [ "$TAG_GIVEN" -eq 0 ]; then
+  echo "--build-only/--skip-build need --tag <new tag>: the prebuilt image is found by its tag." >&2
+  exit 2
+fi
 if [ "$TAG_GIVEN" -eq 1 ] && ! [[ "$NEW_TAG" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
   echo "Invalid --tag '$NEW_TAG' (letters, digits, '.', '_', '-')." >&2
   exit 2
@@ -104,12 +126,36 @@ fi
 # ── Step 3: Bump version tag ───────────────────────────────────────────────────
 step "3/9  Version tag"
 echo "Current ERPNEXT_CUSTOM_TAG: $ERPNEXT_CUSTOM_TAG"
+OLD_TAG="$ERPNEXT_CUSTOM_TAG"
 if [ "$TAG_GIVEN" -eq 0 ]; then
   read -rp "New tag (leave empty to keep '$ERPNEXT_CUSTOM_TAG'): " NEW_TAG
-elif [ "$ASSUME_YES" -eq 1 ] && [ "$NEW_TAG" = "$ERPNEXT_CUSTOM_TAG" ]; then
+elif { [ "$ASSUME_YES" -eq 1 ] || [ "$BUILD_ONLY" -eq 1 ] || [ "$SKIP_BUILD" -eq 1 ]; } && [ "$NEW_TAG" = "$ERPNEXT_CUSTOM_TAG" ]; then
   echo "Aborted: --tag $NEW_TAG is the running image's tag; a build without confirmation needs a new one." >&2
   exit 1
 fi
+
+# What the image is built from. A prebuilt image is only deployed if this is unchanged.
+PREBUILT_MARKER="${CONFIGS_DIR}/prebuilt-${NEW_TAG}.txt"
+build_fingerprint() {
+  printf 'apps.json sha256 %s\nFRAPPE_BRANCH %s\n' \
+    "$(sha256sum "$ERPNEXT_CUSTOM_APPS_JSON_FILE" | cut -d' ' -f1)" "$FRAPPE_BRANCH"
+}
+if [ "$SKIP_BUILD" -eq 1 ]; then
+  if ! docker image inspect "$ERPNEXT_CUSTOM_IMAGE:$NEW_TAG" >/dev/null 2>&1; then
+    echo "Aborted: --skip-build, but image $ERPNEXT_CUSTOM_IMAGE:$NEW_TAG is not on this host." >&2
+    echo "  Prebuild it with --build-only (or drop --skip-build). Nothing was changed." >&2
+    exit 1
+  fi
+  if [ ! -f "$PREBUILT_MARKER" ] || [ "$(cat "$PREBUILT_MARKER")" != "$(build_fingerprint)" ]; then
+    echo "Aborted: --skip-build, but $ERPNEXT_CUSTOM_IMAGE:$NEW_TAG was not built from the current" >&2
+    echo "  apps.json + FRAPPE_BRANCH (marker $PREBUILT_MARKER missing or different). Nothing was changed." >&2
+    diff <(cat "$PREBUILT_MARKER" 2>/dev/null) <(build_fingerprint) >&2
+    exit 1
+  fi
+  echo "Prebuilt image found, built from the current apps.json + FRAPPE_BRANCH:"
+  sed 's/^/  /' "$PREBUILT_MARKER"
+fi
+COMPOSE_SUM_BEFORE=$(md5sum "$ERPNEXT_CUSTOM_TARGET_YAML_FILE" 2>/dev/null | cut -d' ' -f1)
 if [ -n "$NEW_TAG" ]; then
   sed -i "s/^ERPNEXT_CUSTOM_TAG=.*/ERPNEXT_CUSTOM_TAG=$NEW_TAG/" .env
   export ERPNEXT_CUSTOM_TAG=$NEW_TAG
@@ -130,8 +176,47 @@ else
 fi
 
 # ── Step 4: Build ──────────────────────────────────────────────────────────────
-step "4/9  Build custom image + generate compose"
-scripts/erpnext-custom-setup.sh --fresh || { echo "Build failed. Aborting."; exit 1; }
+if [ "$SKIP_BUILD" -eq 1 ]; then
+  step "4/9  Build skipped (--skip-build), generate compose for $ERPNEXT_CUSTOM_TAG"
+  scripts/erpnext-custom-setup.sh --config-only || { echo "Compose generation failed. Aborting."; exit 1; }
+else
+  step "4/9  Build custom image + generate compose"
+  if ! scripts/erpnext-custom-setup.sh --fresh; then
+    if [ "$BUILD_ONLY" -eq 1 ]; then
+      # A failed prebuild must not leave the new tag in .env for the next restart to pick up.
+      sed -i "s/^ERPNEXT_CUSTOM_TAG=.*/ERPNEXT_CUSTOM_TAG=$OLD_TAG/" .env
+      echo "  .env restored to $OLD_TAG" >&2
+    fi
+    echo "Build failed. Aborting."; exit 1
+  fi
+fi
+
+# ── Prebuild ends here ─────────────────────────────────────────────────────────
+# The build has rewritten .env and the compose file to the new tag. Left like that, the next
+# restart of the running stack (dockerd, host, a colleague) would start the new image without
+# migrate. So put both back to the running tag and prove the compose file is the old one again.
+if [ "$BUILD_ONLY" -eq 1 ]; then
+  step "Prebuild done: restore .env + compose to the running tag $OLD_TAG"
+  sed -i "s/^ERPNEXT_CUSTOM_TAG=.*/ERPNEXT_CUSTOM_TAG=$OLD_TAG/" .env
+  export ERPNEXT_CUSTOM_TAG=$OLD_TAG
+  scripts/erpnext-custom-setup.sh --config-only || { echo "RESTORE FAILED: compose file may name $NEW_TAG. Fix before any restart." >&2; exit 1; }
+  COMPOSE_SUM_AFTER=$(md5sum "$ERPNEXT_CUSTOM_TARGET_YAML_FILE" | cut -d' ' -f1)
+  if [ "$COMPOSE_SUM_AFTER" != "$COMPOSE_SUM_BEFORE" ]; then
+    echo "RESTORE CHECK FAILED: compose file differs from before the build ($COMPOSE_SUM_BEFORE -> $COMPOSE_SUM_AFTER)." >&2
+    echo "  Compare with git/backup before any restart of the ERPNext stack." >&2
+    exit 1
+  fi
+  echo "  .env ERPNEXT_CUSTOM_TAG=$(grep '^ERPNEXT_CUSTOM_TAG=' .env | cut -d= -f2), compose file IDENTICAL to before"
+  build_fingerprint > "$PREBUILT_MARKER"
+  echo "  marker $PREBUILT_MARKER:"
+  sed 's/^/    /' "$PREBUILT_MARKER"
+  echo ""
+  echo "══════════════════════════════════════════"
+  echo "  Prebuild complete: $ERPNEXT_CUSTOM_IMAGE:$NEW_TAG (not running)"
+  echo "  Deploy later: scripts/deploy.sh --tag $NEW_TAG --yes --skip-build"
+  echo "══════════════════════════════════════════"
+  exit 0
+fi
 
 # ── Step 5: Restart ────────────────────────────────────────────────────────────
 step "5/9  Restart ERPNext"

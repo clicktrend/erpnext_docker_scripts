@@ -53,6 +53,23 @@ setsid nohup scripts/deploy.sh --tag 0.0.19.5 --yes > /tmp/deploy-0.0.19.5.log 2
 `--yes` requires `--tag` with a tag other than the running one, so the previous image stays on the
 host for a rollback. Without options the script asks as before.
 
+**Prebuild, then deploy in the window (since 2026-11-17).** The build is 20–30 of the ~35 minutes and
+touches nothing live; only steps 5–8 do. So build ahead and deploy later:
+
+```bash
+setsid nohup scripts/deploy.sh --tag 0.0.34.0 --yes --build-only > /tmp/build-0.0.34.0.log 2>&1 &
+# later, with someone watching:
+setsid nohup scripts/deploy.sh --tag 0.0.34.0 --yes --skip-build > /tmp/deploy-0.0.34.0.log 2>&1 &
+```
+
+`--build-only` puts `.env` and the generated compose file back to the running tag afterwards and
+checks the compose file is byte-identical to before (the build step rewrites both; left like that,
+any restart in between would start the new image without `migrate`). It writes
+`.configs/prebuilt-<tag>.txt` with the `apps.json` hash and `FRAPPE_BRANCH`. `--skip-build` aborts
+before changing anything if the image is missing or that marker does not match the current state.
+⚠️ `prune-images.sh` keeps the 3 newest tags plus the running one; a prebuilt image survives that
+unless several deploys happen in between.
+
 ## Key Commands
 
 All scripts must be run from the project root (they use `common.sh` which `cd`s to the root and sources `.env`).
