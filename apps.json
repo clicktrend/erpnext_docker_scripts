@@ -17,11 +17,11 @@
   },
   {
     "url": "git@gitlab.com:clicktrend/process_catalog.git",
-    "branch": "v0.1.1"
+    "branch": "v0.2.0"
   },
   {
     "url": "git@gitlab.com:clicktrend/adomio_erpnext_app.git",
-    "branch": "v0.0.38.2"
+    "branch": "v0.0.38.3"
   },
   {
     "url": "https://github.com/alyf-de/erpnext_germany.git",
